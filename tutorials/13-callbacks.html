@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 </head>
+
 <body class="chapter-callbacks">
     <button class="theme-toggle">🌓</button>
     <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
@@ -56,7 +58,7 @@
     Chain->>Callback: on_chain_end()
     Chain-->>User: 最终结果
 
-    Note over Callback: 在每个阶段都可以<br/>记录日志、修改数据或触发操作</code></pre>
+    Note over Callback: 在每个阶段都可以<br/>记录日志、修改数据或触发操作</pre>
 
                 <h2>内置回调处理器</h2>
 
@@ -315,7 +317,7 @@ response = llm.invoke(
 
     BaseCallbackHandler <|-- StdOutCallbackHandler
     BaseCallbackHandler <|-- TokenCounterCallback
-    BaseCallbackHandler <|-- CustomLoggingCallback</code></pre>
+    BaseCallbackHandler <|-- CustomLoggingCallback</pre>
 
                 <h2>在链上使用回调</h2>
 
@@ -618,4 +620,5 @@ llm.invoke("你好", config={"callbacks": [____]})</code></pre>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="../assets/js/main.js"></script>
 </body>
+
 </html>

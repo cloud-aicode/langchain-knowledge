@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 </head>
+
 <body class="chapter-tools">
     <button class="theme-toggle">🌓</button>
     <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
@@ -120,7 +122,7 @@ if response.tool_calls:
 
                 <pre class="mermaid">sequenceDiagram
     participant U as 用户
-    participant L as LLM + bind_tools
+    participant L as 模型 (绑定工具)
     participant T as 工具
 
     U->>L: "北京天气怎么样？"
@@ -481,7 +483,8 @@ def cached_lookup(code: str) -> str:
                         </div>
                         <div class="options">
                             <div class="option" onclick="this.classList.toggle('selected')">A. 创建新工具</div>
-                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 将工具直接绑定到 LLM</div>
+                            <div class="option correct-option onclick=" this.classList.toggle('selected')">B. 将工具直接绑定到
+                                LLM</div>
                             <div class="option" onclick="this.classList.toggle('selected')">C. 验证工具参数</div>
                             <div class="option" onclick="this.classList.toggle('selected')">D. 缓存工具结果</div>
                         </div>
@@ -495,7 +498,8 @@ def cached_lookup(code: str) -> str:
                         <div class="options">
                             <div class="option" onclick="this.classList.toggle('selected')">A. 创建数据库</div>
                             <div class="option" onclick="this.classList.toggle('selected')">B. 备份数据库</div>
-                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 让 LLM 能与 SQL 数据库交互</div>
+                            <div class="option correct-option onclick=" this.classList.toggle('selected')">C. 让 LLM 能与
+                                SQL 数据库交互</div>
                             <div class="option" onclick="this.classList.toggle('selected')">D. 加密数据库</div>
                         </div>
                     </div>
@@ -508,7 +512,8 @@ def cached_lookup(code: str) -> str:
                         <div class="options">
                             <div class="option" onclick="this.classList.toggle('selected')">A. 只在工具内部处理</div>
                             <div class="option" onclick="this.classList.toggle('selected')">B. 只在 Agent 中处理</div>
-                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 工具内部 + 链中的错误处理器</div>
+                            <div class="option correct-option onclick=" this.classList.toggle('selected')">C. 工具内部 +
+                                链中的错误处理器</div>
                             <div class="option" onclick="this.classList.toggle('selected')">D. 不需要处理</div>
                         </div>
                     </div>
@@ -538,7 +543,8 @@ result = tool_chain.invoke({"key": "value"})</code></pre>
                         </div>
                         <details style="margin-top: 10px;">
                             <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
-                            <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                            <div
+                                style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
                                 <code>process</code>
                             </div>
                         </details>
@@ -610,7 +616,8 @@ print(result)</code></pre>
                         </div>
                         <details style="margin-top: 10px;">
                             <summary style="cursor: pointer; color: var(--primary-color);">查看参考方案</summary>
-                            <div style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                            <div
+                                style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
                                 <strong>方案要点：</strong>
                                 <ul>
                                     <li><strong>输入验证</strong>：严格验证文件路径，防止路径遍历攻击</li>
@@ -632,7 +639,8 @@ print(result)</code></pre>
                         <div class="options">
                             <div class="option" onclick="this.classList.toggle('selected')">A. 忽略错误</div>
                             <div class="option" onclick="this.classList.toggle('selected')">B. 重试直到成功</div>
-                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 捕获异常并返回友好的错误信息</div>
+                            <div class="option correct-option onclick=" this.classList.toggle('selected')">C.
+                                捕获异常并返回友好的错误信息</div>
                             <div class="option" onclick="this.classList.toggle('selected')">D. 终止程序</div>
                         </div>
                     </div>
@@ -704,4 +712,5 @@ print(result)</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </body>
+
 </html>

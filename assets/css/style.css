@@ -31,10 +31,16 @@
 [data-theme="dark"] {
     /* Obsidian Theme (Dark Mode) */
     --bg-color: #0f172a;
-    /* Slate 900 for main content/body */
+    /* Slate 900 */
     --text-color: #cbd5e1;
     /* Slate 300 */
     --border-color: #1e293b;
+
+    /* Override Primary Colors for Visibility */
+    --primary-color: #f8fafc;
+    /* Slate 50 (White-ish) */
+    --secondary-color: #94a3b8;
+    /* Slate 400 */
 
     /* Sidebar Specifics - Obsidian */
     --code-bg: #020617;
