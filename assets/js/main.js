@@ -2,60 +2,60 @@
 const chapters = [
     { id: 'index', title: '首页', file: 'index.html' },
     // 基础部分
-    { id: 'quickstart', title: '快速入门', file: '01-quickstart.html', section: '基础知识' },
+    { id: 'quickstart', title: '快速入门', file: 'tutorials/01-quickstart.html', section: '基础知识' },
     // 核心部分
-    { id: 'models', title: '模型模块', file: '02-models.html', section: '核心模块' },
-    { id: 'prompts', title: '提示工程', file: '03-prompts.html', section: '核心模块' },
-    { id: 'chains', title: '链式调用', file: '04-chains.html', section: '核心模块' },
-    { id: 'tools', title: '工具系统', file: '05-tools.html', section: '核心模块' },
-    { id: 'agents', title: '智能体', file: '06-agents.html', section: '核心模块' },
+    { id: 'models', title: '模型模块', file: 'tutorials/02-models.html', section: '核心模块' },
+    { id: 'prompts', title: '提示工程', file: 'tutorials/03-prompts.html', section: '核心模块' },
+    { id: 'chains', title: '链式调用', file: 'tutorials/04-chains.html', section: '核心模块' },
+    { id: 'tools', title: '工具系统', file: 'tutorials/05-tools.html', section: '核心模块' },
+    { id: 'agents', title: '智能体', file: 'tutorials/06-agents.html', section: '核心模块' },
     // 数据处理
-    { id: 'document-loaders', title: '文档加载', file: '07-document-loaders.html', section: '数据处理' },
-    { id: 'text-splitters', title: '文本分割', file: '08-text-splitters.html', section: '数据处理' },
-    { id: 'output-parsers', title: '输出解析', file: '09-output-parsers.html', section: '数据处理' },
+    { id: 'document-loaders', title: '文档加载', file: 'tutorials/07-document-loaders.html', section: '数据处理' },
+    { id: 'text-splitters', title: '文本分割', file: 'tutorials/08-text-splitters.html', section: '数据处理' },
+    { id: 'output-parsers', title: '输出解析', file: 'tutorials/09-output-parsers.html', section: '数据处理' },
     // 高级功能
-    { id: 'memory', title: '记忆管理', file: '10-memory.html', section: '高级功能' },
-    { id: 'embeddings', title: '嵌入向量', file: '11-embeddings.html', section: '高级功能' },
-    { id: 'retrieval', title: 'RAG检索', file: '12-retrieval.html', section: '高级功能' },
+    { id: 'memory', title: '记忆管理', file: 'tutorials/10-memory.html', section: '高级功能' },
+    { id: 'embeddings', title: '嵌入向量', file: 'tutorials/11-embeddings.html', section: '高级功能' },
+    { id: 'retrieval', title: 'RAG检索', file: 'tutorials/12-retrieval.html', section: '高级功能' },
     // 观测与评估
-    { id: 'callbacks', title: '回调系统', file: '13-callbacks.html', section: '观测与评估' },
-    { id: 'streaming', title: '流式处理', file: '14-streaming.html', section: '观测与评估' },
-    { id: 'tracing', title: '链路追踪', file: '15-tracing.html', section: '观测与评估' },
-    { id: 'evaluation', title: '评估框架', file: '16-evaluation.html', section: '观测与评估' },
+    { id: 'callbacks', title: '回调系统', file: 'tutorials/13-callbacks.html', section: '观测与评估' },
+    { id: 'streaming', title: '流式处理', file: 'tutorials/14-streaming.html', section: '观测与评估' },
+    { id: 'tracing', title: '链路追踪', file: 'tutorials/15-tracing.html', section: '观测与评估' },
+    { id: 'evaluation', title: '评估框架', file: 'tutorials/16-evaluation.html', section: '观测与评估' },
     // 高级主题
-    { id: 'langgraph', title: '图工作流', file: '17-langgraph.html', section: '高级主题' },
+    { id: 'langgraph', title: '图工作流', file: 'tutorials/17-langgraph.html', section: '高级主题' },
     // 最佳实践
-    { id: 'best-practices', title: '最佳实践', file: '18-best-practices.html', section: '进阶内容' },
+    { id: 'best-practices', title: '最佳实践', file: 'tutorials/18-best-practices.html', section: '进阶内容' },
     // API 参考总目录
     { id: 'api-ref', title: 'API 参考', file: 'api-reference/index.html', section: 'API 参考' },
     // 核心 API
-    { id: 'api-language-models', title: '语言模型', file: 'api-reference/language-models.html', section: 'API 参考' },
-    { id: 'api-chat-models', title: '聊天模型', file: 'api-reference/chat-models.html', section: 'API 参考' },
-    { id: 'api-prompts', title: '提示模板', file: 'api-reference/prompts.html', section: 'API 参考' },
-    { id: 'api-chains', title: '链式调用', file: 'api-reference/chains.html', section: 'API 参考' },
-    { id: 'api-runnables', title: 'Runnable接口', file: 'api-reference/runnables.html', section: 'API 参考' },
-    { id: 'api-agents', title: '智能体', file: 'api-reference/agents.html', section: 'API 参考' },
-    { id: 'api-tools', title: '工具', file: 'api-reference/tools.html', section: 'API 参考' },
+    { id: 'api-language-models', title: '语言模型', file: 'api-reference/language-models.html', section: 'API: 模型与提示' },
+    { id: 'api-chat-models', title: '聊天模型', file: 'api-reference/chat-models.html', section: 'API: 模型与提示' },
+    { id: 'api-prompts', title: '提示模板', file: 'api-reference/prompts.html', section: 'API: 模型与提示' },
+    { id: 'api-chains', title: '链式调用', file: 'api-reference/chains.html', section: 'API: 核心组件' },
+    { id: 'api-runnables', title: 'Runnable接口', file: 'api-reference/runnables.html', section: 'API: 核心组件' },
+    { id: 'api-agents', title: '智能体', file: 'api-reference/agents.html', section: 'API: 核心组件' },
+    { id: 'api-tools', title: '工具', file: 'api-reference/tools.html', section: 'API: 核心组件' },
     // 数据处理 API
-    { id: 'api-document-loaders', title: '文档加载器', file: 'api-reference/document-loaders.html', section: 'API 参考' },
-    { id: 'api-text-splitters', title: '文本分割器', file: 'api-reference/text-splitters.html', section: 'API 参考' },
-    { id: 'api-embeddings', title: '嵌入模型', file: 'api-reference/embeddings.html', section: 'API 参考' },
+    { id: 'api-document-loaders', title: '文档加载器', file: 'api-reference/document-loaders.html', section: 'API: 数据与检索' },
+    { id: 'api-text-splitters', title: '文本分割器', file: 'api-reference/text-splitters.html', section: 'API: 数据与检索' },
+    { id: 'api-embeddings', title: '嵌入模型', file: 'api-reference/embeddings.html', section: 'API: 数据与检索' },
     // 检索 API
-    { id: 'api-vector-stores', title: '向量存储', file: 'api-reference/vector-stores.html', section: 'API 参考' },
-    { id: 'api-retrievers', title: '检索器', file: 'api-reference/retrievers.html', section: 'API 参考' },
-    { id: 'api-stores', title: '存储后端', file: 'api-reference/stores.html', section: 'API 参考' },
+    { id: 'api-vector-stores', title: '向量存储', file: 'api-reference/vector-stores.html', section: 'API: 数据与检索' },
+    { id: 'api-retrievers', title: '检索器', file: 'api-reference/retrievers.html', section: 'API: 数据与检索' },
+    { id: 'api-stores', title: '存储后端', file: 'api-reference/stores.html', section: 'API: 数据与检索' },
     // 状态管理 API
-    { id: 'api-memory', title: '记忆管理', file: 'api-reference/memory.html', section: 'API 参考' },
-    { id: 'api-checkpointers', title: '检查点', file: 'api-reference/checkpointers.html', section: 'API 参考' },
+    { id: 'api-memory', title: '记忆管理', file: 'api-reference/memory.html', section: 'API: 状态与高级' },
+    { id: 'api-checkpointers', title: '检查点', file: 'api-reference/checkpointers.html', section: 'API: 状态与高级' },
     // 输入输出 API
-    { id: 'api-output-parsers', title: '输出解析器', file: 'api-reference/output-parsers.html', section: 'API 参考' },
-    { id: 'api-document-transformers', title: '文档转换器', file: 'api-reference/document-transformers.html', section: 'API 参考' },
+    { id: 'api-output-parsers', title: '输出解析器', file: 'api-reference/output-parsers.html', section: 'API: 模型与提示' },
+    { id: 'api-document-transformers', title: '文档转换器', file: 'api-reference/document-transformers.html', section: 'API: 数据与检索' },
     // 监控评估 API
-    { id: 'api-callbacks', title: '回调', file: 'api-reference/callbacks.html', section: 'API 参考' },
-    { id: 'api-tracers', title: '追踪器', file: 'api-reference/tracers.html', section: 'API 参考' },
-    { id: 'api-evaluators', title: '评估器', file: 'api-reference/evaluators.html', section: 'API 参考' },
+    { id: 'api-callbacks', title: '回调', file: 'api-reference/callbacks.html', section: 'API: 状态与高级' },
+    { id: 'api-tracers', title: '追踪器', file: 'api-reference/tracers.html', section: 'API: 状态与高级' },
+    { id: 'api-evaluators', title: '评估器', file: 'api-reference/evaluators.html', section: 'API: 状态与高级' },
     // 高级功能 API
-    { id: 'api-langgraph', title: 'LangGraph', file: 'api-reference/langgraph.html', section: 'API 参考' }
+    { id: 'api-langgraph', title: 'LangGraph', file: 'api-reference/langgraph.html', section: 'API: 状态与高级' }
 ];
 
 // 初始化
@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCopyButtons();
     initExercises();
     initMermaid();
+    initBackToTop();
 });
 
 // 初始化侧边栏
@@ -77,9 +78,8 @@ function initSidebar() {
 
     const sections = {};
 
-    // 检测当前是否在 api-reference 目录下
     const inApiRef = window.location.pathname.includes('/api-reference/');
-    const pathPrefix = inApiRef ? '../' : '';
+    const inTutorials = window.location.pathname.includes('/tutorials/');
 
     // 获取当前页面的 body class 来确定是哪个章节
     let currentChapterId = null;
@@ -112,16 +112,24 @@ function initSidebar() {
             const isActive = (chapter.id === currentChapterId);
             // 根据当前目录调整链接路径
             let href = chapter.file;
+
             if (inApiRef) {
-                // 在 api-reference 目录下，需要调整路径
+                // 在 API 目录
                 if (chapter.file.startsWith('api-reference/')) {
-                    // API 页面之间的链接使用相对路径
                     href = chapter.file.replace('api-reference/', '');
                 } else {
-                    // 链接到主教程页面需要加上 ../
-                    href = pathPrefix + chapter.file;
+                    href = '../' + chapter.file;
+                }
+            } else if (inTutorials) {
+                // 在教程目录
+                if (chapter.file.startsWith('tutorials/')) {
+                    href = chapter.file.replace('tutorials/', '');
+                } else {
+                    href = '../' + chapter.file;
                 }
             }
+            // 根目录 (index.html) 不需要特殊处理，直接使用 chapter.file
+
             navHTML += `
                 <a href="${href}" class="nav-item ${isActive ? 'active' : ''}" data-chapter="${chapter.id}">
                     ${chapter.title}
@@ -264,4 +272,36 @@ function toggleSidebar() {
     if (sidebar) {
         sidebar.classList.toggle('open');
     }
+}
+
+// 回到顶部功能
+function initBackToTop() {
+    // 1. 创建按钮
+    const btn = document.createElement('button');
+    btn.className = 'back-to-top';
+    btn.innerHTML = '↑';
+    btn.title = '回到顶部';
+    document.body.appendChild(btn);
+
+    // 2. 监听滚动显示/隐藏
+    const mainContent = document.querySelector('.main-content');
+    const scrollTarget = mainContent || window;
+
+    // 如果主要内容区域是滚动的（例如在某些布局中），监听它
+    // 但通常是 window 滚动
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 300) {
+            btn.classList.add('visible');
+        } else {
+            btn.classList.remove('visible');
+        }
+    });
+
+    // 3. 点击事件
+    btn.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
 }

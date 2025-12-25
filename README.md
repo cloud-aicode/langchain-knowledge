@@ -25,7 +25,7 @@
 - `index.html`: 首页
 - `assets/`: 静态资源 (CSS, JS)
 - `api-reference/`: API 文档
-- `*-*.html`: 教程章节
+- `tutorials/`: 教程章节 (01-18)
 
 ## 部署
 

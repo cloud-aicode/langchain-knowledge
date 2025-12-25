@@ -1,21 +1,57 @@
 :root {
-    --primary-color: #3b82f6;
-    --secondary-color: #8b5cf6;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --danger-color: #ef4444;
+    /* Swiss Theme (Light Mode) - Monochrome Update */
+    --primary-color: #171717;
+    /* Neutral Black */
+    --secondary-color: #525252;
+    /* Dark Gray */
+    --success-color: #059669;
+    --warning-color: #d97706;
+    --danger-color: #dc2626;
+
     --bg-color: #ffffff;
-    --text-color: #1f2937;
-    --border-color: #e5e7eb;
-    --code-bg: #1e293b;
+    --text-color: #262626;
+    /* Neutral Dark text */
+    --border-color: #e5e5e5;
+
+    /* Sidebar Specifics - Swiss */
+    --code-bg: #fafafa;
     --sidebar-width: 280px;
+    --sidebar-text: #525252;
+    --sidebar-title: #171717;
+    --sidebar-border: 1px solid #e5e5e5;
+
+    --nav-item-hover: #f5f5f5;
+    --nav-item-active-bg: #171717;
+    --nav-item-active-text: #ffffff;
+
+    --header-gradient-start: #171717;
+    --header-gradient-end: #525252;
 }
 
 [data-theme="dark"] {
+    /* Obsidian Theme (Dark Mode) */
     --bg-color: #0f172a;
-    --text-color: #f1f5f9;
+    /* Slate 900 for main content/body */
+    --text-color: #cbd5e1;
+    /* Slate 300 */
     --border-color: #1e293b;
-    --code-bg: #0f172a;
+
+    /* Sidebar Specifics - Obsidian */
+    --code-bg: #020617;
+    /* Slate 950 sidebar bg */
+    --sidebar-text: #94a3b8;
+    /* Slate 400 */
+    --sidebar-title: #64748b;
+    /* Slate 500 */
+    --sidebar-border: 1px solid rgba(255, 255, 255, 0.05);
+
+    --nav-item-hover: rgba(255, 255, 255, 0.08);
+    --nav-item-active-bg: rgba(255, 255, 255, 0.12);
+    --nav-item-active-text: #f8fafc;
+    /* Slate 50 */
+
+    --header-gradient-start: #f8fafc;
+    --header-gradient-end: #94a3b8;
 }
 
 * {
@@ -31,35 +67,40 @@ body {
     line-height: 1.6;
 }
 
-/* 布局 */
+/* Layout */
 .app-container {
     display: flex;
     min-height: 100vh;
 }
 
-/* 侧边栏 */
+/* Sidebar */
 .sidebar {
     width: var(--sidebar-width);
     background: var(--code-bg);
-    color: white;
+    color: var(--sidebar-text);
     position: fixed;
     height: 100vh;
     overflow-y: auto;
     padding: 20px 0;
     z-index: 100;
+    border-right: var(--sidebar-border);
 }
 
 .sidebar-header {
     padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid transparent;
+    /* Removed visible border for cleaner look */
 }
 
 .sidebar-header h1 {
     font-size: 1.5rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--header-gradient-start), var(--header-gradient-end));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    font-weight: 800;
+    /* Bold for Swiss */
+    letter-spacing: -0.5px;
 }
 
 .sidebar-nav {
@@ -75,30 +116,43 @@ body {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: rgba(255,255,255,0.5);
+    color: var(--sidebar-title);
+    font-weight: 700;
+    opacity: 0.9;
 }
 
 .nav-item {
     display: block;
-    padding: 10px 20px;
-    color: rgba(255,255,255,0.7);
+    padding: 8px 16px;
+    /* Slightly more compact/modern padding */
+    margin: 2px 12px;
+    /* Floating effect */
+    color: var(--sidebar-text);
     text-decoration: none;
-    transition: all 0.3s;
-    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    /* Rounded corners for chips */
+    border-left: none;
+    /* Removed the left border style */
+    font-weight: 500;
 }
 
 .nav-item:hover {
-    background: rgba(255,255,255,0.05);
-    color: white;
+    background: var(--nav-item-hover);
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .nav-item:hover {
+    color: #e2e8f0;
 }
 
 .nav-item.active {
-    background: rgba(59, 130, 246, 0.2);
-    color: white;
-    border-left-color: var(--primary-color);
+    background: var(--nav-item-active-bg);
+    color: var(--nav-item-active-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* 主内容区 */
+/* Main Content Area */
 .main-content {
     margin-left: var(--sidebar-width);
     flex: 1;
@@ -106,14 +160,21 @@ body {
     max-width: 1200px;
 }
 
-/* 内容样式 */
+/* Content Styles */
 .content {
     animation: fadeIn 0.3s ease;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 h1 {
@@ -126,13 +187,13 @@ h1 {
 }
 
 .subtitle {
-    color: rgba(0,0,0,0.5);
+    color: rgba(0, 0, 0, 0.5);
     font-size: 1.1rem;
     margin-bottom: 40px;
 }
 
 [data-theme="dark"] .subtitle {
-    color: rgba(255,255,255,0.5);
+    color: rgba(255, 255, 255, 0.5);
 }
 
 h2 {
@@ -160,30 +221,47 @@ p {
     margin-bottom: 15px;
 }
 
-/* 代码块 */
+/* Code Blocks */
 .code-block {
     background: var(--code-bg);
+    /* Uses same logic as sidebar in dark mode, but maybe need override? */
     border-radius: 10px;
     overflow: hidden;
     margin: 20px 0;
+    border: 1px solid var(--border-color);
 }
+
+/* Ensure code block bg is dark in light mode if we want, or match theme? 
+   Usually code blocks are dark. Let's force dark for code blocks in light mode.
+*/
+:root .code-block {
+    background: #1e293b;
+    border: none;
+}
+
+[data-theme="dark"] .code-block {
+    background: #020617;
+    /* Obsidian bg */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 
 .code-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 15px;
-    background: rgba(0,0,0,0.2);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .code-language {
     font-size: 0.85rem;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .copy-btn {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     border: none;
     color: white;
     padding: 5px 12px;
@@ -194,7 +272,7 @@ p {
 }
 
 .copy-btn:hover {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .copy-btn.copied {
@@ -205,6 +283,8 @@ pre {
     padding: 20px;
     overflow-x: auto;
     margin: 0;
+    color: #f1f5f9;
+    /* Force light text in code blocks */
 }
 
 code {
@@ -213,8 +293,9 @@ code {
     line-height: 1.6;
 }
 
-/* 行内代码 */
-p code, li code {
+/* Inline Code */
+p code,
+li code {
     background: rgba(59, 130, 246, 0.1);
     color: var(--primary-color);
     padding: 2px 6px;
@@ -222,8 +303,9 @@ p code, li code {
     font-size: 0.9em;
 }
 
-/* 列表 */
-ul, ol {
+/* Lists */
+ul,
+ol {
     margin-bottom: 15px;
     padding-left: 25px;
 }
@@ -232,7 +314,7 @@ li {
     margin-bottom: 8px;
 }
 
-/* 表格 */
+/* Tables */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -240,10 +322,11 @@ table {
     background: var(--bg-color);
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-th, td {
+th,
+td {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -258,8 +341,11 @@ tr:hover {
     background: rgba(59, 130, 246, 0.05);
 }
 
-/* 提示框 */
-.tip, .warning, .note, .practice {
+/* Alerts / Callouts */
+.tip,
+.warning,
+.note,
+.practice {
     padding: 15px 20px;
     margin: 20px 0;
     border-radius: 10px;
@@ -286,19 +372,33 @@ tr:hover {
     border-left-color: var(--secondary-color);
 }
 
-.tip::before, .warning::before, .note::before, .practice::before {
+.tip::before,
+.warning::before,
+.note::before,
+.practice::before {
     content: attr(data-label);
     font-weight: 600;
     display: block;
     margin-bottom: 8px;
 }
 
-.tip::before { content: "💡 提示"; }
-.warning::before { content: "⚠️ 警告"; }
-.note::before { content: "📝 注意"; }
-.practice::before { content: "✏️ 练习"; }
+.tip::before {
+    content: "💡 提示";
+}
 
-/* 练习题 */
+.warning::before {
+    content: "⚠️ 警告";
+}
+
+.note::before {
+    content: "📝 注意";
+}
+
+.practice::before {
+    content: "✏️ 练习";
+}
+
+/* Exercise Section */
 .exercise-section {
     background: rgba(139, 92, 246, 0.05);
     border-radius: 10px;
@@ -359,7 +459,7 @@ tr:hover {
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* Mermaid 图表 */
+/* Mermaid */
 .mermaid {
     background: var(--bg-color);
     padding: 20px;
@@ -368,7 +468,7 @@ tr:hover {
     text-align: center;
 }
 
-/* 对比表格 */
+/* Comparison Table */
 .comparison-table {
     margin: 30px 0;
 }
@@ -382,7 +482,7 @@ tr:hover {
     font-weight: 600;
 }
 
-/* 进度条 */
+/* Progress Bar */
 .progress-bar {
     width: 100%;
     height: 8px;
@@ -398,7 +498,7 @@ tr:hover {
     transition: width 0.3s;
 }
 
-/* 章节导航 */
+/* Chapter Nav */
 .chapter-nav {
     display: flex;
     justify-content: space-between;
@@ -428,7 +528,7 @@ tr:hover {
     transform: translateX(5px);
 }
 
-/* 主题切换 */
+/* Theme Toggle */
 .theme-toggle {
     position: fixed;
     top: 20px;
@@ -436,17 +536,21 @@ tr:hover {
     background: var(--code-bg);
     border: none;
     color: white;
+    /* Always white icon for visibility */
     padding: 10px 15px;
     border-radius: 10px;
     cursor: pointer;
     z-index: 1000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* 移动端适配 */
+/* Mobile & Print */
 @media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s;
+        z-index: 1000;
+        border-right: none;
     }
 
     .sidebar.open {
@@ -467,7 +571,6 @@ tr:hover {
     }
 }
 
-/* 移动菜单按钮 */
 .mobile-menu-btn {
     display: none;
     position: fixed;
@@ -487,9 +590,13 @@ tr:hover {
     }
 }
 
-/* 打印样式 */
 @media print {
-    .sidebar, .theme-toggle, .mobile-menu-btn, .copy-btn {
+
+    .sidebar,
+    .theme-toggle,
+    .mobile-menu-btn,
+    .copy-btn,
+    .back-to-top {
         display: none;
     }
 
@@ -504,4 +611,39 @@ tr:hover {
     h2 {
         page-break-after: avoid;
     }
+}
+
+/* Back to Top Button */
+.back-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 45px;
+    height: 45px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.back-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.back-to-top:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
