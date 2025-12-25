@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量存储 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-vector-stores">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>向量存储 API</h1>
+                <p class="subtitle">VectorStore 与向量数据库</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#implementations" class="api-nav-link">实现类</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>向量存储用于存储和检索高维向量，支持语义相似度搜索，是 RAG 应用的核心组件。</p>
+
+                <pre class="mermaid">graph TD
+                    A[VectorStore] --> B[Chroma]
+                    A --> C[FAISS]
+                    A --> D[Pinecone]
+                    A --> E[Weaviate]
+                    A --> F[Milvus]
+                    A --> G[PineconeVectorStore]
+                    A --> H[ElasticVectorSearch]
+
+                    A --> I[本地存储]
+                    I --> J[Chroma]
+                    I --> K[FAISS]
+
+                    A --> L[云端存储]
+                    L --> M[Pinecone]
+                    L --> N[Weaviate]
+
+                    style A fill:#e1f5fe
+                    style I fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">VectorStore</h3>
+                    <p class="api-description">向量存储抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.vectorstores import VectorStore
+
+class VectorStore(ABC):
+    """向量存储基类"""
+
+    @property
+    @abstractmethod
+    def embeddings(self) -> Embeddings:
+        """关联的嵌入模型"""
+
+    @abstractmethod
+    def add_texts(
+        self,
+        texts: List[str],
+        metadatas: Optional[List[dict]] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        """
+        添加文本
+
+        Args:
+            texts: 文本列表
+            metadatas: 元数据列表
+            **kwargs: 额外参数
+
+        Returns:
+            添加的文档 ID 列表
+        """
+
+    @abstractmethod
+    def similarity_search(
+        self,
+        query: str,
+        k: int = 4,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        相似度搜索
+
+        Args:
+            query: 查询文本
+            k: 返回结果数量
+            **kwargs: 额外参数
+
+        Returns:
+            最相似的 Document 列表
+        """
+
+    @abstractmethod
+    def similarity_search_with_score(
+        self,
+        query: str,
+        k: int = 4,
+        **kwargs: Any,
+    ) -> List[Tuple[Document, float]]:
+        """
+        带分数的相似度搜索
+
+        Returns:
+            (Document, 相似度分数) 列表
+        """
+
+    def similarity_search_by_vector(
+        self,
+        embedding: List[float],
+        k: int = 4,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        按向量搜索
+
+        Args:
+            embedding: 查询向量
+            k: 返回结果数量
+
+        Returns:
+            最相似的 Document 列表
+        """
+
+    def max_marginal_relevance_search(
+        self,
+        query: str,
+        k: int = 4,
+        fetch_k: int = 20,
+        lambda_mult: float = 0.5,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        最大边际相关性搜索 (MMR)
+
+        Args:
+            query: 查询文本
+            k: 返回结果数量
+            fetch_k: 获取候选数量
+            lambda_mult: 相关性多样性平衡
+                (0=多样性优先, 1=相关性优先)
+
+        Returns:
+            Document 列表
+        """
+
+    async def asimilarity_search(
+        self,
+        query: str,
+        k: int = 4,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """异步相似度搜索"""
+
+    async def aadd_texts(
+        self,
+        texts: List[str],
+        metadatas: Optional[List[dict]] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        """异步添加文本"""
+
+    @classmethod
+    @abstractmethod
+    def from_texts(
+        cls,
+        texts: List[str],
+        embedding: Embeddings,
+        metadatas: Optional[List[dict]] = None,
+        **kwargs: Any,
+    ) -> "VectorStore":
+        """
+        从文本创建向量存储
+
+        Args:
+            texts: 文本列表
+            embedding: 嵌入模型
+            metadatas: 元数据列表
+            **kwargs: 额外参数
+
+        Returns:
+            VectorStore 实例
+        """
+
+    @classmethod
+    def from_documents(
+        cls,
+        documents: List[Document],
+        embedding: Embeddings,
+        **kwargs: Any,
+    ) -> "VectorStore":
+        """
+        从文档创建向量存储
+
+        Args:
+            documents: Document 列表
+            embedding: 嵌入模型
+            **kwargs: 额外参数
+
+        Returns:
+            VectorStore 实例
+        """
+
+    def delete(
+        self,
+        ids: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> Optional[bool]:
+        """
+        删除文档
+
+        Args:
+            ids: 要删除的文档 ID 列表
+            **kwargs: 额外参数
+
+        Returns:
+            是否成功
+        """
+
+    def as_retriever(
+        self,
+        **kwargs: Any,
+    ) -> VectorStoreRetriever:
+        """
+        转换为检索器
+
+        Args:
+            **kwargs: 检索器参数
+                - search_type: "similarity" 或 "mmr"
+                - search_kwargs: 搜索参数 (k, score_threshold 等)
+
+        Returns:
+            VectorStoreRetriever 实例
+        """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="implementations">实现类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">Chroma</h3>
+                    <p class="api-description">Chroma 向量数据库（本地）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_chroma import Chroma
+
+class Chroma(VectorStore):
+    """Chroma 向量存储"""
+
+    def __init__(
+        self,
+        collection_name: str = "langchain",
+        embedding_function: Optional[Embeddings] = None,
+        persist_directory: Optional[str] = None,
+        client_settings: Optional[ChromaClientSettings] = None,
+        collection_metadata: Optional[dict] = None,
+        client: Optional[ChromaClient] = None,
+    ):
+        """
+        初始化 Chroma
+
+        Args:
+            collection_name: 集合名称
+            embedding_function: 嵌入模型
+            persist_directory: 持久化目录
+            client_settings: 客户端设置
+            collection_metadata: 集合元数据
+            client: 自定义客户端
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+# 内存存储
+vectorstore = Chroma(
+    embedding_function=OpenAIEmbeddings()
+)
+
+# 持久化存储
+vectorstore = Chroma(
+    collection_name="my_collection",
+    embedding_function=OpenAIEmbeddings(),
+    persist_directory="./chroma_db"
+)
+
+# 从文本创建
+vectorstore = Chroma.from_texts(
+    texts=["文档1", "文档2", "文档3"],
+    embedding=OpenAIEmbeddings(),
+    metadatas=[
+        {"source": "txt1"},
+        {"source": "txt2"},
+        {"source": "txt3"}
+    ],
+    collection_name="my_collection"
+)
+
+# 相似度搜索
+results = vectorstore.similarity_search("查询", k=3)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">FAISS</h3>
+                    <p class="api-description">FAISS 向量索引（本地）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.vectorstores import FAISS
+
+class FAISS(VectorStore):
+    """FAISS 向量存储"""
+
+    def __init__(
+        self,
+        embedding_function: Embeddings,
+        index: Any,
+        docstore: Docstore,
+        index_to_docstore_id: Dict[int, str],
+    ):
+        """
+        初始化 FAISS
+
+        Args:
+            embedding_function: 嵌入模型
+            index: FAISS 索引
+            docstore: 文档存储
+            index_to_docstore_id: 索引到文档 ID 的映射
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+
+# 从文本创建
+vectorstore = FAISS.from_texts(
+    texts=["文档1", "文档2", "文档3"],
+    embedding=OpenAIEmbeddings()
+)
+
+# 添加文档
+vectorstore.add_texts(["新文档"])
+
+# 相似度搜索
+results = vectorstore.similarity_search("查询", k=3)
+
+# 保存索引
+vectorstore.save_local("faiss_index")
+
+# 加载索引
+vectorstore = FAISS.load_local(
+    "faiss_index",
+    OpenAIEmbeddings(),
+    allow_dangerous_deserialization=True
+)
+
+# MMR 搜索
+results = vectorstore.max_marginal_relevance_search(
+    "查询",
+    k=3,
+    lambda_mult=0.5
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">PineconeVectorStore</h3>
+                    <p class="api-description">Pinecone 云端向量数据库。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_pinecone import PineconeVectorStore
+
+class PineconeVectorStore(VectorStore):
+    """Pinecone 向量存储"""
+
+    @classmethod
+    def from_texts(
+        cls,
+        texts: List[str],
+        embedding: Embeddings,
+        index_name: str,
+        namespace: str = "",
+        metadatas: Optional[List[dict]] = None,
+        **kwargs: Any,
+    ) -> "PineconeVectorStore":
+        """
+        从文本创建
+
+        Args:
+            texts: 文本列表
+            embedding: 嵌入模型
+            index_name: Pinecone 索引名称
+            namespace: 命名空间
+            metadatas: 元数据列表
+            **kwargs: 额外参数
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_pinecone import PineconeVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+# 初始化
+import os
+os.environ["PINECONE_API_KEY"] = "your-api-key"
+
+vectorstore = PineconeVectorStore.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings(),
+    index_name="my-index",
+    namespace="my-namespace"
+)
+
+# 搜索
+results = vectorstore.similarity_search("查询", k=3)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">WeaviateClient</h3>
+                    <p class="api-description">Weaviate 向量数据库。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_weaviate.vectorstores import WeaviateVectorStore
+
+vectorstore = WeaviateVectorStore.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings(),
+    index_name="MyIndex",
+    text_key="text"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">Milvus</h3>
+                    <p class="api-description">Milvus 向量数据库。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.vectorstores import Milvus
+
+vectorstore = Milvus.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings(),
+    connection_args={"host": "localhost", "port": 19530},
+    collection_name="my_collection"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">Qdrant</h3>
+                    <p class="api-description">Qdrant 向量数据库。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_qdrant import QdrantVectorStore
+
+from qdrant_client import QdrantClient
+
+# 内存模式
+client = QdrantClient(":memory:")
+vectorstore = QdrantVectorStore.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings(),
+    client=client,
+    collection_name="my_collection"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ElasticVectorSearch</h3>
+                    <p class="api-description">Elasticsearch 向量搜索。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.vectorstores import ElasticsearchStore
+
+vectorstore = ElasticsearchStore.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings(),
+    index_name="my-index",
+    es_url="http://localhost:9200"
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 创建向量存储 ==========
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = Chroma(
+    collection_name="my_docs",
+    embedding_function=OpenAIEmbeddings(),
+    persist_directory="./chroma_db"
+)
+
+# ========== 示例2: 添加文档 ==========
+from langchain_core.documents import Document
+
+documents = [
+    Document(page_content="Python 是一种编程语言", metadata={"id": 1}),
+    Document(page_content="JavaScript 也是一种编程语言", metadata={"id": 2})
+]
+
+vectorstore.add_documents(documents)
+
+# ========== 示例3: 相似度搜索 ==========
+results = vectorstore.similarity_search("编程语言", k=2)
+
+for doc in results:
+    print(f"内容: {doc.page_content}")
+    print(f"元数据: {doc.metadata}")
+
+# ========== 示例4: 带分数搜索 ==========
+results = vectorstore.similarity_search_with_score("编程语言", k=2)
+
+for doc, score in results:
+    print(f"分数: {score:.4f}, 内容: {doc.page_content}")
+
+# ========== 示例5: 按向量搜索 ==========
+query_vector = OpenAIEmbeddings().embed_query("编程语言")
+results = vectorstore.similarity_search_by_vector(query_vector, k=3)
+
+# ========== 示例6: MMR 搜索 ==========
+results = vectorstore.max_marginal_relevance_search(
+    "编程语言",
+    k=3,
+    fetch_k=10,
+    lambda_mult=0.5
+)
+
+# ========== 示例7: 过滤搜索 ==========
+from langchain_chroma import Chroma
+
+# 元数据过滤
+results = vectorstore.similarity_search(
+    "编程语言",
+    k=3,
+    filter={"id": {"$eq": 1}}
+)
+
+# ========== 示例8: 转换为检索器 ==========
+retriever = vectorstore.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 3}
+)
+
+# 使用检索器
+results = retriever.invoke("编程语言")
+
+# ========== 示例9: MMR 检索器 ==========
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 3,
+        "fetch_k": 10,
+        "lambda_mult": 0.5
+    }
+)
+
+# ========== 示例10: 删除文档 ==========
+ids = ["doc_id_1", "doc_id_2"]
+vectorstore.delete(ids)
+
+# ========== 示例11: FAISS 索引 ==========
+from langchain_community.vectorstores import FAISS
+
+# 创建索引
+vectorstore = FAISS.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings()
+)
+
+# 保存
+vectorstore.save_local("faiss_index")
+
+# 加载
+vectorstore = FAISS.load_local(
+    "faiss_index",
+    OpenAIEmbeddings(),
+    allow_dangerous_deserialization=True
+)
+
+# ========== 示例12: 批量添加 ==========
+texts = ["文档" + str(i) for i in range(1000)]
+metadatas = [{"index": i} for i in range(1000)]
+
+vectorstore.add_texts(texts, metadatas)</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="retrievers.html">Retrievers API</a></li>
+                    <li><a href="embeddings.html">Embeddings API</a></li>
+                    <li><a href="../12-retrieval.html">教程：RAG 检索</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="embeddings.html">← Embeddings API</a>
+                    <a href="retrievers.html" class="next">Retrievers API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评估框架 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-evaluation">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>评估框架</h1>
+                <p class="subtitle">评估 LLM 应用的质量和性能</p>
+
+                <h2>为什么需要评估？</h2>
+                <p>LLM 应用不像传统软件有明确的"正确"或"错误"答案。评估框架帮助你：</p>
+                <ul>
+                    <li><strong>量化质量</strong>：用数值指标衡量输出质量</li>
+                    <li><strong>对比版本</strong>：比较不同 Prompt、模型的效果</li>
+                    <li><strong>回归测试</strong>：确保更新不影响现有功能</li>
+                    <li><strong>持续改进</strong>：数据驱动的优化决策</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    评估不应该是一次性任务，而应该是持续进行的过程——就像单元测试一样，每次改动都应该运行评估。
+                </div>
+
+                <h2>评估指标体系</h2>
+
+                <pre class="mermaid">graph TD
+    A[评估指标] --> B[正确性指标]
+    A --> C[质量指标]
+    A --> D[性能指标]
+
+    B --> B1[准确率]
+    B --> B2[相关性]
+    B --> B3[正确性]
+
+    C --> C1[连贯性]
+    C --> C2[有用性]
+    C --> C3[简洁性]
+
+    D --> D1[响应时间]
+    D --> D2[Token 使用]
+    D --> D3[成本]
+
+    style B fill:#ffcdd2
+    style C fill:#fff9c4
+    style D fill:#c8e6c9</code></pre>
+
+                <h2>基础评估：StringEvaluator</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.evaluators import StringEvaluator
+from langchain_core.prompts import ChatPromptTemplate
+
+# 自定义评估器
+class ExactMatchEvaluator(StringEvaluator):
+    """精确匹配评估器"""
+
+    def evaluate_strings(
+        self, prediction: str, reference: str = None, input: str = None
+    ) -> dict:
+        """评估预测输出是否与参考输出完全匹配"""
+        score = 1 if prediction.strip() == reference.strip() else 0
+        return {
+            "score": score,
+            "reasoning": f"预测: {prediction} | 参考: {reference}"
+        }
+
+# 使用评估器
+evaluator = ExactMatchEvaluator()
+
+result = evaluator.evaluate_strings(
+    prediction="Python 是一种编程语言",
+    reference="Python 是一种编程语言"
+)
+print(f"分数: {result['score']}")  # 分数: 1
+
+result = evaluator.evaluate_strings(
+    prediction="Python 是一门语言",
+    reference="Python 是一种编程语言"
+)
+print(f"分数: {result['score']}")  # 分数: 0</code></pre>
+                </div>
+
+                <h2>使用 LLM 作为评估器</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.evaluators import load_evaluator
+
+# 加载内置的 "correctness" 评估器
+evaluator = load_evaluator(
+    "labeled_criteria",
+    criteria="correctness",  # 评估标准
+    llm=ChatOpenAI(model="gpt-4o", temperature=0)
+)
+
+# 评估输出
+result = evaluator.evaluate_strings(
+    prediction="巴黎是法国的首都",
+    reference="巴黎是法国的首都",
+    input="法国的首都是哪里？"
+)
+
+print(f"分数: {result['score']}")  # 0-1 之间的分数
+print(f"理由: {result.get('reasoning', '')}")
+
+# 评估失败的例子
+result = evaluator.evaluate_strings(
+    prediction="伦敦是法国的首都",
+    reference="巴黎是法国的首都",
+    input="法国的首都是哪里？"
+)
+
+print(f"分数: {result['score']}")  # 接近 0
+print(f"理由: {result.get('reasoning', '')}")</code></pre>
+                </div>
+
+                <h2>自定义评估标准</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+# 自定义评估标准
+custom_criteria = {
+    "helpful": "输出是否对用户有帮助？",
+    "concise": "输出是否简洁明了？",
+    "accurate": "输出是否准确无误？",
+    "relevant": "输出是否与输入相关？"
+}
+
+evaluator = load_evaluator(
+    "criteria",
+    criteria=custom_criteria,
+    llm=ChatOpenAI(model="gpt-4o", temperature=0)
+)
+
+result = evaluator.evaluate_strings(
+    prediction="是的，Python 是一种高级编程语言，由 Guido van Rossum 创建，"
+              "以其简洁的语法和强大的功能而闻名，广泛应用于数据科学、机器学习、Web 开发等领域。",
+    input="Python 是什么？"
+)
+
+print(f"分数: {result['score']}")
+print(f"详细评分: {result.get('reasoning', '')}")</code></pre>
+                </div>
+
+                <h2>成对比较评估</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+# 成对比较评估器：比较两个输出哪个更好
+evaluator = load_evaluator(
+    "labeled_pairwise_string",
+    criteria="helpfulness",  # 比较标准
+    llm=ChatOpenAI(model="gpt-4o", temperature=0)
+)
+
+result = evaluator.evaluate_string_pairs(
+    prediction="Python 是一种编程语言",
+    prediction_b="Python 是一种由 Guido van Rossum 创建的高级编程语言，"
+                 "以其简洁的语法和强大的功能而闻名。",
+    input="Python 是什么？",
+    reference="Python 是一种编程语言"  # 可选的参考答案
+)
+
+print(f"胜出: {result['score']}")  # A 或 B
+print(f"理由: {result.get('reasoning', '')}")</code></pre>
+                </div>
+
+                <h2>批量评估</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.evaluators import load_evaluator
+from langchain_core.prompts import ChatPromptTemplate
+
+# 创建测试数据集
+test_cases = [
+    {
+        "input": "什么是 Python？",
+        "reference": "Python 是一种高级编程语言"
+    },
+    {
+        "input": "什么是 LangChain？",
+        "reference": "LangChain 是一个用于构建 LLM 应用的框架"
+    },
+    {
+        "input": "什么是 RAG？",
+        "reference": "RAG 是检索增强生成技术"
+    }
+]
+
+# 创建要评估的链
+prompt = ChatPromptTemplate.from_template("回答：{input}")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 创建评估器
+evaluator = load_evaluator(
+    "labeled_criteria",
+    criteria="correctness",
+    llm=ChatOpenAI(model="gpt-4o", temperature=0)
+)
+
+# 批量评估
+results = []
+for case in test_cases:
+    # 生成预测
+    prediction = chain.invoke(case)
+
+    # 评估
+    result = evaluator.evaluate_strings(
+        prediction=prediction.content,
+        reference=case["reference"],
+        input=case["input"]
+    )
+
+    results.append({
+        "input": case["input"],
+        "score": result["score"],
+        "reasoning": result.get("reasoning", "")
+    })
+
+# 打印结果
+for r in results:
+    print(f"输入: {r['input']}")
+    print(f"分数: {r['score']}")
+    print(f"理由: {r['reasoning'][:100]}...")
+    print("---")</code></pre>
+                </div>
+
+                <h2>RAG 系统评估（RAGAS）</h2>
+                <p>RAG（检索增强生成）系统的特殊评估指标：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,      # 答案是否基于检索到的上下文
+    answer_relevancy,  # 答案是否与问题相关
+    context_recall,    # 检索到的上下文是否包含正确信息
+    context_precision  # 检索到的上下文是否精确相关
+)
+
+# RAG 评估数据集
+test_data = {
+    "question": [
+        "什么是 LangChain？",
+        "LangChain 支持哪些模型？"
+    ],
+    "answer": [
+        "LangChain 是一个用于构建 LLM 应用的框架",
+        "LangChain 支持 OpenAI、Anthropic、Google 等多种模型"
+    ],
+    "contexts": [
+        ["LangChain 是一个开源框架..."],
+        ["LangChain 集成了 OpenAI GPT-4...", "支持 Anthropic Claude..."]
+    ],
+    "ground_truth": [
+        "LangChain 是 LLM 应用开发框架",
+        "OpenAI, Anthropic, Google 等"
+    ]
+}
+
+# 运行 RAG 评估
+result = evaluate(
+    test_data,
+    metrics=[
+        faithfulness,
+        answer_relevancy,
+        context_recall,
+        context_precision
+    ]
+)
+
+# 查看结果
+print(result.to_pandas())
+
+# 输出示例：
+#   faithfulness  answer_relevancy  context_recall  context_precision
+# 0         0.95              0.88            0.90               0.92
+# 1         0.90              0.85            0.88               0.90</code></pre>
+                </div>
+
+                <h2>自定义评估指标</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.evaluators import StringEvaluator
+from typing import Optional
+
+class KeywordCoverageEvaluator(StringEvaluator):
+    """关键词覆盖评估器"""
+
+    def __init__(self, keywords: list[str]):
+        self.keywords = [kw.lower() for kw in keywords]
+
+    def evaluate_strings(
+        self,
+        prediction: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None
+    ) -> dict:
+        """计算预测输出中关键词的覆盖率"""
+        prediction_lower = prediction.lower()
+
+        covered = sum(1 for kw in self.keywords if kw in prediction_lower)
+        coverage = covered / len(self.keywords) if self.keywords else 0
+
+        return {
+            "score": coverage,
+            "keywords_covered": covered,
+            "total_keywords": len(self.keywords),
+            "missing_keywords": [
+                kw for kw in self.keywords
+                if kw not in prediction_lower
+            ]
+        }
+
+# 使用自定义评估器
+evaluator = KeywordCoverageEvaluator(
+    keywords=["Python", "编程", "语言", "框架"]
+)
+
+result = evaluator.evaluate_strings(
+    prediction="Python 是一种强大的编程语言"
+)
+
+print(f"覆盖率: {result['score']:.2%}")  # 75%
+print(f"覆盖关键词: {result['keywords_covered']}/{result['total_keywords']}")
+print(f"缺失关键词: {result['missing_keywords']}")  # ['框架']</code></pre>
+                </div>
+
+                <h2>评估最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 建立基准测试集</h3>
+                    <ul>
+                        <li>包含各种典型场景</li>
+                        <li>有明确的预期输出</li>
+                        <li>定期更新和扩展</li>
+                    </ul>
+
+                    <h3>2. 使用多个评估维度</h3>
+                    <ul>
+                        <li>正确性：答案是否正确</li>
+                        <li>相关性：是否回答了问题</li>
+                        <li>质量：语言表达是否清晰</li>
+                        <li>完整性：是否遗漏重要信息</li>
+                    </ul>
+
+                    <h3>3. 自动化评估流程</h3>
+                    <ul>
+                        <li>集成到 CI/CD</li>
+                        <li>每次代码变更都运行</li>
+                        <li>设置性能阈值</li>
+                    </ul>
+
+                    <h3>4. 持续监控</h3>
+                    <ul>
+                        <li>生产环境的评估</li>
+                        <li>用户反馈收集</li>
+                        <li>A/B 测试</li>
+                    </ul>
+
+                    <h3>5. 迭代优化</h3>
+                    <ul>
+                        <li>根据评估结果调整</li>
+                        <li>对比不同版本</li>
+                        <li>记录优化历史</li>
+                    </ul>
+                </div>
+
+                <h2>评估框架图</h2>
+
+                <pre class="mermaid">graph TD
+    A[LLM 应用] --> B[生成输出]
+    B --> C[评估器]
+
+    C --> D{评估类型?}
+    D -->|正确性| E[StringEvaluator]
+    D -->|质量| F[Criteria Evaluator]
+    D -->|对比| G[Pairwise Evaluator]
+    D -->|RAG| H[RAGAS Evaluator]
+
+    E --> I[评估分数]
+    F --> I
+    G --> I
+    H --> I
+
+    I --> J[生成报告]
+    J --> K[优化决策]
+
+    style I fill:#c8e6c9
+    style K fill:#fff9c4</code></pre>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. RAGAS 中的 faithfulness 指标衡量什么？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 答案的长度</div>
+                            <div class="option correct-option">B. 答案是否基于检索到的上下文</div>
+                            <div class="option">C. 答案的语法正确性</div>
+                            <div class="option">D. 检索速度</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 哪个评估器用于比较两个输出的优劣？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. StringEvaluator</div>
+                            <div class="option">B. Criteria Evaluator</div>
+                            <div class="option correct-option">C. Pairwise Evaluator</div>
+                            <div class="option">D. RAGAS Evaluator</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. load_evaluator 函数的 criteria 参数是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 评估数据集</div>
+                            <div class="option">B. 要评估的模型</div>
+                            <div class="option correct-option">C. 评估标准字典或预定义名称</div>
+                            <div class="option">D. 输出格式</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：创建一个评估器评估答案的有用性
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+evaluator = load_evaluator(
+    "____",
+    criteria="____",
+    llm=ChatOpenAI(model="gpt-4o")
+)
+
+result = evaluator.evaluate_strings(
+    prediction="LangChain 是一个框架...",
+    input="什么是 LangChain？"
+)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个自定义评估器，检查输出中是否包含特定关键词
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你正在优化一个 RAG 系统的检索策略（从 BM25 改为混合检索）。你会如何设计评估来验证新策略的效果？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="15-tracing.html">← 上一章：链路追踪</a>
+                    <a href="17-langgraph.html" class="next">下一章：图工作流 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

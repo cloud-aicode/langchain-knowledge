@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本分割器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-text-splitters">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>文本分割器 API</h1>
+                <p class="subtitle">TextSplitter 与文本分割</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#splitters" class="api-nav-link">常用分割器</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>文本分割器将长文本分割为较小的块，以便于嵌入和检索。LangChain 提供了多种分割策略。</p>
+
+                <pre class="mermaid">graph TD
+                    A[TextSplitter] --> B[CharacterTextSplitter]
+                    A --> C[RecursiveCharacterTextSplitter]
+                    A --> D[SemanticTextSplitter]
+
+                    A --> E[代码分割]
+                    E --> F[PythonCodeSplitter]
+                    E --> G[JavaScriptSplitter]
+
+                    A --> H[特殊格式]
+                    H --> I[MarkdownTextSplitter]
+                    H --> J[LatexTextSplitter]
+
+                    style A fill:#e1f5fe
+                    style C fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">TextSplitter</h3>
+                    <p class="api-description">所有文本分割器的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import TextSplitter
+
+class TextSplitter(ABC):
+    """文本分割器基类"""
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        分割文本
+
+        Args:
+            text: 要分割的文本
+
+        Returns:
+            分割后的文本块列表
+        """
+
+    def split_documents(self, documents: List[Document]) -> List[Document]:
+        """
+        分割文档列表
+
+        Args:
+            documents: Document 列表
+
+        Returns:
+            分割后的 Document 列表
+        """
+
+    @staticmethod
+    def _join_docs(docs: List[str], separator: str) -> str:
+        """合并文档块"""
+
+    def create_documents(
+        self,
+        texts: List[str],
+        metadatas: Optional[List[dict]] = None,
+    ) -> List[Document]:
+        """从文本创建文档"""
+
+    def split_text_to_chunks(self, text: str) -> Iterator[str]:
+        """生成文本块（迭代器）"""</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="splitters">常用分割器</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">RecursiveCharacterTextSplitter</h3>
+                    <p class="api-description">递归字符分割器（推荐）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+class RecursiveCharacterTextSplitter(TextSplitter):
+    """递归字符分割器"""
+
+    def __init__(
+        self,
+        separators: Optional[List[str]] = None,
+        keep_separator: bool = True,
+        chunk_size: int = 4000,
+        chunk_overlap: int = 200,
+        length_function: Callable[[str], int] = len,
+        strip_whitespace: bool = True,
+    ):
+        """
+        初始化
+
+        Args:
+            separators: 分隔符列表（按优先级）
+                默认: ["\n\n", "\n", " ", ""]
+            keep_separator: 是否在结果中保留分隔符
+            chunk_size: 块大小（字符数）
+            chunk_overlap: 块之间的重叠字符数
+            length_function: 计算长度的函数
+            strip_whitespace: 是否去除空白
+        """
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        递归分割文本
+
+        优先使用前一个分隔符分割，
+        如果块仍太大，则使用下一个分隔符
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 基础使用
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200
+)
+
+chunks = splitter.split_text(large_text)
+
+# 自定义分隔符
+splitter = RecursiveCharacterTextSplitter(
+    separators=["\n\n\n", "\n\n", "\n", "。", "！", "？", " ", ""],
+    chunk_size=500,
+    chunk_overlap=50
+)
+
+# 分割文档
+from langchain_core.documents import Document
+
+documents = splitter.split_documents([
+    Document(page_content=large_text)
+])
+
+# 使用 token 计数
+import tiktoken
+
+encoding = tiktoken.get_encoding("cl100k_base")
+
+def token_count(text: str) -> int:
+    return len(encoding.encode(text))
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,  # 1000 tokens
+    chunk_overlap=200,
+    length_function=token_count
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">CharacterTextSplitter</h3>
+                    <p class="api-description">简单字符分割器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import CharacterTextSplitter
+
+class CharacterTextSplitter(TextSplitter):
+    """字符分割器"""
+
+    def __init__(
+        self,
+        separator: str = "\n\n",
+        keep_separator: bool = False,
+        chunk_size: int = 4000,
+        chunk_overlap: int = 200,
+        length_function: Callable[[str], int] = len,
+        strip_whitespace: bool = True,
+    ):
+        """
+        初始化
+
+        Args:
+            separator: 分隔符（仅使用一个）
+            keep_separator: 是否保留分隔符
+            chunk_size: 块大小
+            chunk_overlap: 重叠大小
+            length_function: 长度计算函数
+            strip_whitespace: 是否去除空白
+        """
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        按分隔符分割文本
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_text_splitters import CharacterTextSplitter
+
+# 按段落分割
+splitter = CharacterTextSplitter(
+    separator="\n\n",
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+chunks = splitter.split_text(text)
+
+# 按句子分割
+splitter = CharacterTextSplitter(
+    separator="。",
+    chunk_size=500,
+    chunk_overlap=50,
+    keep_separator=True
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">SemanticTextSplitter</h3>
+                    <p class="api-description">语义分割器（基于嵌入相似度）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_experimental.text_splitter import SemanticTextSplitter
+
+class SemanticTextSplitter(TextSplitter):
+    """语义分割器"""
+
+    def __init__(
+        self,
+        embeddings: Embeddings,
+        breakpoint_threshold: float = 0.5,
+        buffer_size: int = 1,
+        chunk_size: int = 1000,
+    ):
+        """
+        初始化
+
+        Args:
+            embeddings: 嵌入模型
+            breakpoint_threshold: 分割阈值（0-1）
+            buffer_size: 缓冲区大小
+            chunk_size: 目标块大小
+        """
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        基于语义相似度分割
+        在语义变化大的位置分割
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_experimental.text_splitter import SemanticTextSplitter
+from langchain_openai import OpenAIEmbeddings
+
+splitter = SemanticTextSplitter(
+    embeddings=OpenAIEmbeddings(),
+    breakpoint_threshold=0.6,
+    chunk_size=1000
+)
+
+chunks = splitter.split_text(long_article)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">代码分割器</h3>
+
+                    <h4>PythonCodeSplitter</h4>
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import PythonCodeSplitter
+
+splitter = PythonCodeSplitter(
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+# 按函数、类定义分割
+chunks = splitter.split_text(python_code)</code></pre>
+                    </div>
+
+                    <h4>JavaScriptSplitter</h4>
+                    <div class="code-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import JavaScriptSplitter
+
+splitter = JavaScriptSplitter(
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+chunks = splitter.split_text(js_code)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">MarkdownTextSplitter</h3>
+                    <p class="api-description">Markdown 文本分割器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import MarkdownTextSplitter
+
+class MarkdownTextSplitter(TextSplitter):
+    """Markdown 分割器"""
+
+    def __init__(
+        self,
+        headers_to_split_on: List[Tuple[str, str]] = [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+        ],
+        chunk_size: int = 4000,
+        chunk_overlap: int = 200,
+    ):
+        """
+        初始化
+
+        Args:
+            headers_to_split_on: 要分割的标题级别
+            chunk_size: 块大小
+            chunk_overlap: 重叠大小
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_text_splitters import MarkdownTextSplitter
+
+splitter = MarkdownTextSplitter(
+    headers_to_split_on=[
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ],
+    chunk_size=2000,
+    chunk_overlap=200
+)
+
+chunks = splitter.split_text(markdown_content)
+
+# 带元数据的分割
+from langchain_text_splitters import MarkdownHeaderTextSplitter
+
+splitter = MarkdownHeaderTextSplitter(
+    headers_to_split_on=[
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+    ]
+)
+
+docs = splitter.split_text(markdown_content)
+# 每个 Document 包含对应级别的标题作为 metadata</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">LatexTextSplitter</h3>
+                    <p class="api-description">LaTeX 文本分割器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import LatexTextSplitter
+
+splitter = LatexTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+chunks = splitter.split_text(latex_content)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">NLTKTextSplitter</h3>
+                    <p class="api-description">使用 NLTK 进行句子分割。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import NLTKTextSplitter
+
+splitter = NLTKTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+chunks = splitter.split_text(text)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">SpacyTextSplitter</h3>
+                    <p class="api-description">使用 spaCy 进行句子分割。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_text_splitters import SpacyTextSplitter
+
+splitter = SpacyTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=100,
+    separator=" "  # 使用 spaCy 的句子边界
+)
+
+chunks = splitter.split_text(text)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 递归分割 ==========
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    length_function=len,
+)
+
+chunks = splitter.split_text(large_text)
+print(f"分割成 {len(chunks)} 块")
+
+# ========== 示例2: 分割文档列表 ==========
+from langchain_core.documents import Document
+
+documents = [
+    Document(page_content="文档1内容..."),
+    Document(page_content="文档2内容...")
+]
+
+split_docs = splitter.split_documents(documents)
+
+# ========== 示例3: 自定义分隔符 ==========
+splitter = RecursiveCharacterTextSplitter(
+    separators=["\n\n\n", "\n\n", "\n", "。", "！", "？", " ", ""],
+    chunk_size=500,
+    chunk_overlap=50,
+    keep_separator=True
+)
+
+# ========== 示例4: 使用 token 计数 ==========
+import tiktoken
+
+encoding = tiktoken.encoding_for_model("gpt-4")
+
+def token_count(text: str) -> int:
+    return len(encoding.encode(text))
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,  # tokens
+    chunk_overlap=200,
+    length_function=token_count
+)
+
+# ========== 示例5: 添加元数据 ==========
+from langchain_core.documents import Document
+from typing import Dict, List
+
+class MetadataSplitter(RecursiveCharacterTextSplitter):
+    def split_text(self, text: str, metadata: Dict = None) -> List[Document]:
+        chunks = super().split_text(text)
+        return [
+            Document(
+                page_content=chunk,
+                metadata=metadata or {}
+            )
+            for chunk in chunks
+        ]
+
+splitter = MetadataSplitter(chunk_size=1000, chunk_overlap=200)
+docs = splitter.split_text(text, metadata={"source": "document.txt"})
+
+# ========== 示例6: HTML 内容分割 ==========
+from langchain_text_splitters import HTMLHeaderTextSplitter
+
+html_splitter = HTMLHeaderTextSplitter(
+    headers_to_split_on=[
+        ("h1", "Header 1"),
+        ("h2", "Header 2"),
+        ("h3", "Header 3"),
+    ]
+)
+
+docs = html_splitter.split_text(html_content)
+
+# ========== 示例7: 递归分割 HTML ==========
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+html_splitter = HTMLHeaderTextSplitter()
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000)
+
+# 先按 HTML 结构分割，再按字符分割
+html_docs = html_splitter.split_text(html_content)
+final_docs = text_splitter.split_documents(html_docs)
+
+# ========== 示例8: 流式分割大文件 ==========
+
+def split_large_file(file_path: str, chunk_size: int = 1000):
+    """流式分割大文件"""
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=200
+    )
+
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    for i, chunk in enumerate(splitter.split_text(content)):
+        yield {
+            "index": i,
+            "content": chunk,
+            "metadata": {"source": file_path, "chunk": i}
+        }
+
+# 使用
+for chunk_data in split_large_file("large.txt"):
+    process_chunk(chunk_data)</code></pre>
+                </div>
+
+                <h2>参数建议</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>场景</th>
+                        <th>chunk_size</th>
+                        <th>chunk_overlap</th>
+                        <th>分隔符</th>
+                    </tr>
+                    <tr>
+                        <td>通用文本</td>
+                        <td>1000-2000</td>
+                        <td>200</td>
+                        <td>默认</td>
+                    </tr>
+                    <tr>
+                        <td>代码</td>
+                        <td>500-1000</td>
+                        <td>50-100</td>
+                        <td>代码相关</td>
+                    </tr>
+                    <tr>
+                        <td>长文档</td>
+                        <td>2000-4000</td>
+                        <td>400</td>
+                        <td>段落、句子</td>
+                    </tr>
+                    <tr>
+                        <td>中文文本</td>
+                        <td>500-1000</td>
+                        <td>100</td>
+                        <td>句子、标点</td>
+                    </tr>
+                </table>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="document-loaders.html">Document Loaders API</a></li>
+                    <li><a href="embeddings.html">Embeddings API</a></li>
+                    <li><a href="../08-text-splitters.html">教程：文本分割</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="document-loaders.html">← Document Loaders API</a>
+                    <a href="embeddings.html" class="next">Embeddings API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

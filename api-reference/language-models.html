@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语言模型 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-language-models">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>语言模型 API</h1>
+                <p class="subtitle">BaseLanguageModel 与 LLM 统一接口</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#classes" class="api-nav-link">核心类</a>
+                    <a href="#methods" class="api-nav-link">方法</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>LangChain 的语言模型模块提供了与各种 LLM 提供商交互的统一接口。所有语言模型都继承自 <code>BaseLanguageModel</code> 基类，提供一致的 API。</p>
+
+                <pre class="mermaid">graph TD
+                    A[BaseLanguageModel] --> B[LLM]
+                    A --> C[BaseChatModel]
+
+                    B --> D[OpenAI]
+                    B --> E[Anthropic]
+                    B --> F[Hugging Face]
+
+                    C --> G[ChatOpenAI]
+                    C --> H[ChatAnthropic]
+                    C --> I[ChatGoogleGenerativeAI]
+
+                    style A fill:#e1f5fe
+                    style C fill:#c8e6c9</code></pre>
+
+                <h2 id="classes">核心类</h2>
+
+                <div class="api-section" id="baselanguagemodel">
+                    <h3 class="api-title">BaseLanguageModel</h3>
+                    <p class="api-description">所有语言模型的抽象基类，定义了统一接口规范。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class BaseLanguageModel(Serializable, Runnable[LanguageModelInput, LanguageModelOutput], Generic[LanguageModelInput, LanguageModelOutput]):
+    """语言模型基类"""
+
+    @property
+    @abstractmethod
+    def _llm_type(self) -> str:
+        """返回模型类型标识"""
+
+    @abstractmethod
+    def _generate(
+        self,
+        prompts: List[str],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> LLMResult:
+        """生成响应的核心方法"""
+
+    def generate_prompt(
+        self,
+        prompts: List[PromptValue],
+        stop: Optional[List[str]] = None,
+        callbacks: Callbacks = None,
+        **kwargs: Any,
+    ) -> LLMResult:
+        """基于 PromptValue 生成响应"""
+
+    async def agenerate_prompt(
+        self,
+        prompts: List[PromptValue],
+        stop: Optional[List[str]] = None,
+        callbacks: Callbacks = None,
+        **kwargs: Any,
+    ) -> LLMResult:
+        """异步生成响应"""</code></pre>
+                    </div>
+
+                    <h4>属性</h4>
+                    <table class="api-table">
+                        <tr>
+                            <th>属性</th>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>_llm_type</td>
+                            <td>str</td>
+                            <td>模型类型标识（如 "openai", "anthropic"）</td>
+                        </tr>
+                    </table>
+
+                    <h4>相关链接</h4>
+                    <ul>
+                        <li><a href="../02-models.html">教程：语言模型</a></li>
+                        <li><a href="chat-models.html">API: Chat Models</a></li>
+                    </ul>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">LLM</h3>
+                    <p class="api-description">纯文本语言模型基类，处理字符串输入输出。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class LLM(BaseLanguageModel[str, str]):
+    """纯文本语言模型"""
+
+    def __call__(self, text: str) -> str:
+        """调用模型的便捷方法"""
+
+    def predict(self, text: str, **kwargs: Any) -> str:
+        """预测文本（兼容方法）"""
+
+    def predict_messages(
+        self,
+        messages: List[BaseMessage],
+        **kwargs: Any
+    ) -> BaseMessage:
+        """预测消息响应"""</code></pre>
+                    </div>
+
+                    <h4>常用实现类</h4>
+                    <ul>
+                        <li><code>OpenAI</code> - OpenAI GPT 模型</li>
+                        <li><code>Anthropic</code> - Anthropic Claude 模型</li>
+                        <li><code>HuggingFacePipeline</code> - Hugging Face 模型</li>
+                    </ul>
+                </div>
+
+                <h2 id="methods">核心方法</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">invoke</h3>
+                    <p class="api-description">同步调用模型生成响应。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def invoke(
+    self,
+    input: LanguageModelInput,
+    config: Optional[RunnableConfig] = None,
+    stop: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> LanguageModelOutput:
+    """
+    调用模型
+
+    Args:
+        input: 输入文本或消息列表
+        config: 运行配置（包含 callbacks, metadata 等）
+        stop: 停止词列表
+        **kwargs: 额外参数
+
+    Returns:
+        模型输出（字符串或 AIMessage）
+    """</code></pre>
+                    </div>
+
+                    <h4>参数说明</h4>
+                    <table class="api-table">
+                        <tr>
+                            <th>参数</th>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>input</td>
+                            <td>str | List[str]</td>
+                            <td>输入提示文本</td>
+                        </tr>
+                        <tr>
+                            <td>config</td>
+                            <td>RunnableConfig | None</td>
+                            <td>运行配置，可包含 callbacks、tags、metadata</td>
+                        </tr>
+                        <tr>
+                            <td>stop</td>
+                            <td>List[str] | None</td>
+                            <td>停止生成词列表</td>
+                        </tr>
+                        <tr>
+                            <td>**kwargs</td>
+                            <td>Any</td>
+                            <td>模型特定参数（如 temperature, max_tokens）</td>
+                        </tr>
+                    </table>
+
+                    <h4>返回值</h4>
+                    <table class="api-table">
+                        <tr>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>str</td>
+                            <td>生成的文本响应</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">stream</h3>
+                    <p class="api-description">流式调用模型，逐 token 返回结果。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def stream(
+    self,
+    input: LanguageModelInput,
+    config: Optional[RunnableConfig] = None,
+    stop: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> Iterator[LanguageModelOutput]:
+    """
+    流式调用模型
+
+    Args:
+        input: 输入文本
+        config: 运行配置
+        stop: 停止词
+        **kwargs: 额外参数
+
+    Yields:
+        逐 token 返回的输出
+    """</code></pre>
+                    </div>
+
+                    <h4>返回值</h4>
+                    <table class="api-table">
+                        <tr>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>Iterator[str]</td>
+                            <td>文本块的迭代器</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">batch</h3>
+                    <p class="api-description">批量处理多个输入。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def batch(
+    self,
+    inputs: List[LanguageModelInput],
+    config: Optional[Union[RunnableConfig, List[RunnableConfig]]] = None,
+    stop: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> List[LanguageModelOutput]:
+    """
+    批量调用模型
+
+    Args:
+        inputs: 输入列表
+        config: 配置（单个或多个）
+        stop: 停止词
+        **kwargs: 额外参数
+
+    Returns:
+        输出列表
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ainvoke / astream / abatch</h3>
+                    <p class="api-description">异步版本的调用方法。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">async def ainvoke(
+    self,
+    input: LanguageModelInput,
+    config: Optional[RunnableConfig] = None,
+    stop: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> LanguageModelOutput:
+    """异步调用模型"""
+
+async def astream(
+    self,
+    input: LanguageModelInput,
+    config: Optional[RunnableConfig] = None,
+    stop: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> AsyncIterator[LanguageModelOutput]:
+    """异步流式调用"""
+
+async def abatch(
+    self,
+    inputs: List[LanguageModelInput],
+    config: Optional[Union[RunnableConfig, List[RunnableConfig]]] = None,
+    **kwargs: Any,
+) -> List[LanguageModelOutput]:
+    """异步批量调用"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">bind</h3>
+                    <p class="api-description">绑定参数到模型，创建新的可运行对象。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def bind(
+    self,
+    **kwargs: Any,
+) -> Runnable[LanguageModelInput, LanguageModelOutput]:
+    """
+    绑定参数
+
+    Args:
+        **kwargs: 要绑定的参数（如 temperature=0.7）
+
+    Returns:
+        绑定参数后的新 Runnable
+    """</code></pre>
+                    </div>
+
+                    <h4>示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_openai import OpenAI
+
+llm = OpenAI(model="gpt-3.5-turbo-instruct")
+cool_llm = llm.bind(temperature=0.3)
+creative_llm = llm.bind(temperature=0.9)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">with_types</h3>
+                    <p class="api-description">配置输入输出类型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def with_types(
+    self,
+    input_type: Optional[Type[LanguageModelInput]] = None,
+    output_type: Optional[Type[LanguageModelOutput]] = None,
+) -> Runnable[LanguageModelInput, LanguageModelOutput]:
+    """
+    配置类型
+
+    Args:
+        input_type: 输入类型
+        output_type: 输出类型
+
+    Returns:
+        配置类型后的 Runnable
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">get_num_tokens</h3>
+                    <p class="api-description">计算文本的 token 数量。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def get_num_tokens(self, text: str) -> int:
+    """
+    计算 token 数量
+
+    Args:
+        text: 要计算的文本
+
+    Returns:
+        token 数量
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">get_num_tokens_from_messages</h3>
+                    <p class="api-description">计算消息列表的 token 数量。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def get_num_tokens_from_messages(
+    self,
+    messages: List[BaseMessage],
+) -> int:
+    """
+    计算消息的 token 数量
+
+    Args:
+        messages: 消息列表
+
+    Returns:
+        token 总数
+    """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import OpenAI
+
+# 初始化模型
+llm = OpenAI(
+    model="gpt-3.5-turbo-instruct",
+    temperature=0.7,
+    max_tokens=1000,
+    api_key="your-api-key"
+)
+
+# 基础调用
+response = llm.invoke("讲一个关于 Python 的故事")
+print(response)
+
+# 流式调用
+for chunk in llm.stream("用三句话介绍人工智能"):
+    print(chunk, end="", flush=True)
+
+# 批量调用
+responses = llm.batch([
+    "什么是 Python?",
+    "什么是 JavaScript?",
+    "什么是 Rust?"
+])
+
+# 绑定参数
+cool_llm = llm.bind(temperature=0.1)
+response = cool_llm.invoke("写一首关于编程的诗")
+
+# 带配置的调用
+response = llm.invoke(
+    "写一首关于春天的诗",
+    config={
+        "tags": ["creative", "poetry"],
+        "metadata": {"user_id": "user_123"}
+    }
+)
+
+# 异步调用
+import asyncio
+
+async def async_example():
+    response = await llm.ainvoke("你好")
+    print(response)
+
+    async for chunk in llm.astream("介绍 LangChain"):
+        print(chunk, end="", flush=True)
+
+asyncio.run(async_example())</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="chat-models.html">Chat Models API</a> - 聊天模型接口</li>
+                    <li><a href="prompts.html">Prompts API</a> - 提示模板</li>
+                    <li><a href="runnables.html">Runnables API</a> - Runnable 接口</li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="index.html">← API 参考</a>
+                    <a href="chat-models.html" class="next">Chat Models API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

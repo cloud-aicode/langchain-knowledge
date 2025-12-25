@@ -1,0 +1,11 @@
+{
+    "name": "langchain-knowledge",
+    "version": "1.0.0",
+    "description": "LangChain 1.0 知识点整理",
+    "scripts": {
+        "start": "serve ."
+    },
+    "dependencies": {
+        "serve": "^14.2.0"
+    }
+}

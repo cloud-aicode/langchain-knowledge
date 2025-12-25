@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最佳实践 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-best-practices">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>最佳实践 (Best Practices)</h1>
+                <p class="subtitle">生产环境部署指南</p>
+
+                <h2>生产部署清单</h2>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0;">
+                    <div style="padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">✅</div>
+                        <div style="font-weight: 600; margin-top: 10px;">错误处理</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px; color: rgba(0,0,0,0.6);">try-except + 重试机制</div>
+                    </div>
+                    <div style="padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">⚡</div>
+                        <div style="font-weight: 600; margin-top: 10px;">性能优化</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px; color: rgba(0,0,0,0.6);">批处理、缓存、流式</div>
+                    </div>
+                    <div style="padding: 20px; background: rgba(239, 68, 68, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">🔒</div>
+                        <div style="font-weight: 600; margin-top: 10px;">安全性</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px; color: rgba(0,0,0,0.6);">输入验证、提示注入防护</div>
+                    </div>
+                    <div style="padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">📊</div>
+                        <div style="font-weight: 600; margin-top: 10px;">监控日志</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px; color: rgba(0,0,0,0.6);">追踪、指标、告警</div>
+                    </div>
+                </div>
+
+                <h2>init_chat_model() 统一初始化（v1.0 新特性）</h2>
+
+                <p><code>init_chat_model()</code> 是 LangChain 1.0 的统一模型初始化接口，支持多提供商：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.chat_models import init_chat_model
+
+# 方式一：从环境变量自动选择提供商
+llm = init_chat_model(
+    model="gpt-4o",
+    temperature=0.7
+)
+
+# 方式二：指定提供商
+llm = init_chat_model(
+    model="claude-3-5-sonnet-20241022",
+    model_provider="anthropic",
+    temperature=0.5,
+    max_tokens=1000
+)
+
+# 方式三：运行时动态配置
+llm = init_chat_model(
+    model="gpt-4o",
+    temperature=0,
+    configurable_fields={
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "model": "gpt-4o-mini"  # 运行时切换模型
+    }
+)
+
+# 支持的提供商：
+# - openai: GPT-4, GPT-4o, GPT-4o-mini
+# - anthropic: Claude 3.5 Sonnet, Claude 3 Opus
+# - google: Gemini Pro, Gemini Flash
+# - mistralai: Mistral Large, Mixtral</code></pre>
+                </div>
+
+                <pre class="mermaid">graph TD
+    A[init_chat_model] --> B{模型选择}
+    B -->|环境变量| C[自动检测提供商]
+    B -->|指定| D[Anthropic/OpenAI/Google]
+    C --> E[返回 LLM 实例]
+    D --> E
+    E --> F[统一接口调用]</code></pre>
+
+                <h2>可配置模型（configurable_fields）</h2>
+
+                <p>允许在运行时动态配置模型参数：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.runnables import ConfigurableField
+
+# 创建可配置模型
+llm = ChatOpenAI(model="gpt-4o").configurable_fields(
+    temperature=ConfigurableField(
+        id="llm_temperature",
+        name="LLM Temperature",
+        description="控制输出的随机性"
+    ),
+    model=ConfigurableField(
+        id="llm_model",
+        name="LLM Model",
+        description="使用的模型名称"
+    ),
+    max_tokens=ConfigurableField(
+        id="llm_max_tokens",
+        name="Max Tokens",
+        description="最大输出 tokens"
+    )
+)
+
+# 使用时配置
+result = llm.invoke(
+    "讲一个简短的故事",
+    config={"configurable": {
+        "llm_temperature": 0.9,
+        "llm_model": "gpt-4o-mini",
+        "llm_max_tokens": 100
+    }}
+)</code></pre>
+                </div>
+
+                <h2>速率限制器（InMemoryRateLimiter）</h2>
+
+                <p>防止 API 调用超过速率限制：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.rate_limiters import InMemoryRateLimiter
+from langchain_openai import ChatOpenAI
+
+# 创建速率限制器（令牌桶算法）
+rate_limiter = InMemoryRateLimiter(
+    requests_per_second=0.1,     # 每 10 秒 1 个请求
+    check_every_n_seconds=0.1,    # 每 100ms 检查一次
+    max_bucket_size=10            # 最大突发请求数
+)
+
+# 应用到模型
+llm = ChatOpenAI(
+    model="gpt-4o",
+    rate_limiter=rate_limiter
+)
+
+# 批量调用时会自动限制
+inputs = ["问题1", "问题2", "问题3"]
+results = llm.batch(inputs)</code></pre>
+                </div>
+
+                <pre class="mermaid">graph LR
+    A[请求] --> B[速率限制器]
+    B --> C{令牌桶}
+    C -->|有令牌| D[发送请求]
+    C -->|无令牌| E[等待]
+    E --> C
+    D --> F[处理响应]</code></pre>
+
+                <h3>多提供商速率限制</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.rate_limiters import InMemoryRateLimiter
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+# 为不同提供商配置不同限制
+openai_limiter = InMemoryRateLimiter(requests_per_second=2)
+anthropic_limiter = InMemoryRateLimiter(requests_per_second=1)
+
+openai_llm = ChatOpenAI(
+    model="gpt-4o",
+    rate_limiter=openai_limiter
+)
+
+anthropic_llm = ChatAnthropic(
+    model="claude-3-5-sonnet-20241022",
+    rate_limiter=anthropic_limiter
+)</code></pre>
+                </div>
+
+                <h2>代理配置</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import os
+from langchain_openai import ChatOpenAI
+import httpx
+
+# 方式一：环境变量
+os.environ["HTTP_PROXY"] = "http://proxy.example.com:8080"
+os.environ["HTTPS_PROXY"] = "http://proxy.example.com:8080"
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 方式二：直接配置（推荐）
+llm = ChatOpenAI(
+    model="gpt-4o",
+    http_client=httpx.AsyncClient(
+        proxies="http://proxy.example.com:8080",
+        timeout=30.0
+    )
+)
+
+# 方式三：SOCKS 代理
+import httpx_socks
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    http_client=httpx.AsyncClient(
+        proxy=httpx_socks.Proxy(
+            proxy_url="socks5://127.0.0.1:1080"
+        )
+    )
+)</code></pre>
+                </div>
+
+                <h2>自定义回调处理器</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+from typing import Any, Dict, List
+
+class TokenCounterCallback(BaseCallbackHandler):
+    """自定义 Token 计数回调"""
+
+    def __init__(self):
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_tokens = 0
+
+    def on_llm_start(self, prompts: List[str], **kwargs) -> None:
+        """LLM 开始时调用"""
+        print(f"开始处理，提示词长度: {len(prompts[0])}")
+
+    def on_llm_end(self, response: LLMResult, **kwargs) -> None:
+        """LLM 结束时调用"""
+        for generation in response.generations:
+            for output in generation:
+                if hasattr(output, 'generation_info'):
+                    info = output.generation_info or {}
+                    self.prompt_tokens += info.get('prompt_tokens', 0)
+                    self.completion_tokens += info.get('completion_tokens', 0)
+                    self.total_tokens += info.get('total_tokens', 0)
+
+        print(f"本次调用 - 输入: {self.prompt_tokens}, 输出: {self.completion_tokens}")
+
+    def get_stats(self) -> Dict[str, int]:
+        """获取统计信息"""
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens
+        }
+
+# 使用回调
+counter = TokenCounterCallback()
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    callbacks=[counter]
+)
+
+result = llm.invoke("写一首诗")
+print(counter.get_stats())</code></pre>
+                </div>
+
+                <h2>流式回调</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import BaseMessage
+
+class StreamingCallback(BaseCallbackHandler):
+    """流式输出回调"""
+
+    def __init__(self):
+        self.tokens = []
+
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        """每个新 token 时调用"""
+        self.tokens.append(token)
+        print(token, end="", flush=True)
+
+    def get_full_response(self) -> str:
+        """获取完整响应"""
+        return "".join(self.tokens)
+
+# 使用流式回调
+streaming = StreamingCallback()
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    streaming=True,
+    callbacks=[streaming]
+)
+
+result = llm.invoke("讲一个短故事")
+print(f"\n完整响应长度: {len(streaming.get_full_response())}")</code></pre>
+                </div>
+
+                <pre class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant LLM as LLM
+    participant CB as Callback
+    participant S as 统计服务
+
+    U->>LLM: 调用 invoke
+    LLM->>CB: on_llm_start
+    LLM->>CB: on_llm_new_token (流式)
+    LLM->>CB: on_llm_end
+    CB->>S: 记录统计
+    LLM-->>U: 返回结果</code></pre>
+
+                <h2>成本预算控制</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain.callbacks import get_openai_callback
+
+class BudgetExceededError(Exception):
+    """超出预算异常"""
+    pass
+
+class BudgetControlCallback:
+    """预算控制回调"""
+
+    PRICES = {
+        "gpt-4o": {"input": 0.005, "output": 0.015},    # 每 1K tokens
+        "gpt-4o-mini": {"input": 0.00015, "output": 0.0006}
+    }
+
+    def __init__(self, model: str, budget: float):
+        self.model = model
+        self.budget = budget
+        self.spent = 0.0
+
+    def check_budget(self, cb) -> bool:
+        """检查是否超出预算"""
+        if self.spent >= self.budget:
+            raise BudgetExceededError(
+                f"已超出预算: ${self.spent:.4f} / ${self.budget:.4f}"
+            )
+        return True
+
+    def update_cost(self, cb) -> None:
+        """更新成本"""
+        prices = self.PRICES.get(self.model, {"input": 0, "output": 0})
+        input_cost = cb.prompt_tokens / 1000 * prices["input"]
+        output_cost = cb.completion_tokens / 1000 * prices["output"]
+        self.spent += input_cost + output_cost
+
+# 使用预算控制
+budget_controller = BudgetControlCallback("gpt-4o", budget=1.0)
+llm = ChatOpenAI(model="gpt-4o")
+
+try:
+    with get_openai_callback() as cb:
+        for i in range(10):
+            budget_controller.check_budget(cb)
+            result = llm.invoke(f"问题 {i}")
+            budget_controller.update_cost(cb)
+            print(f"已消费: ${budget_controller.spent:.4f}")
+except BudgetExceededError as e:
+    print(e)</code></pre>
+                </div>
+
+                <h2>错误处理</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnableRetryWithMessage, RunnableWithFallbacks
+from langchain_openai import ChatOpenAI
+
+# 带重试的链
+llm = ChatOpenAI(model="gpt-4o")
+
+retry_chain = RunnableRetryWithMessage(
+    llm,
+    max_retries=3,
+    retry_error_message="生成失败，正在重试..."
+)
+
+# 优雅降级
+primary = ChatOpenAI(model="gpt-4o")
+fallback = ChatOpenAI(model="gpt-4o-mini")
+
+chain_with_fallback = RunnableWithFallbacks(
+    primary,
+    fallbacks=[fallback]
+)
+
+# 使用
+try:
+    result = retry_chain.invoke("写一首诗")
+except Exception as e:
+    result = chain_with_fallback.invoke("写一首诗")</code></pre>
+                </div>
+
+                <h2>性能优化</h2>
+
+                <h3>批量处理</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatOpenAI(model="gpt-4o")
+prompt = ChatPromptTemplate.from_template("翻译成英文：{text}")
+chain = prompt | llm
+
+# 批量调用
+inputs = [
+    {"text": "你好"},
+    {"text": "世界"},
+    {"text": "LangChain"}
+]
+
+# 方式一：batch()
+results = chain.batch(inputs)
+
+# 方式二：并发批处理
+async def abatch_chain():
+    return await chain.abatch(inputs)
+
+import asyncio
+results = asyncio.run(abatch_chain())</code></pre>
+                </div>
+
+                <h3>缓存</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.cache import InMemoryCache, RedisCache
+from langchain_openai import ChatOpenAI
+from langchain_core.globals import set_llm_cache
+
+# 启用内存缓存
+set_llm_cache(InMemoryCache())
+
+# 或使用 Redis 缓存
+set_llm_cache(RedisCache(
+    redis_url="redis://localhost:6379/0"
+))
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 第一次调用会执行
+result1 = llm.invoke("什么是 Python？")
+
+# 相同输入会返回缓存结果
+result2 = llm.invoke("什么是 Python？")
+print(result1 == result2)  # True</code></pre>
+                </div>
+
+                <h2>安全性</h2>
+
+                <div class="warning" data-label="安全警告">
+                    <strong>提示注入</strong>：恶意用户可能通过精心设计的输入来操纵模型行为。始终验证和清理用户输入。
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import re
+
+def validate_input(user_input: str) -> str:
+    """验证和清理用户输入"""
+    # 移除危险字符
+    cleaned = re.sub(r'[<>{}]', '', user_input)
+
+    # 限制长度
+    if len(cleaned) > 1000:
+        cleaned = cleaned[:1000]
+
+    # 检测注入模式
+    injection_patterns = [
+        r'忽略.*指令',
+        r'forget.*instructions',
+        r'override.*system',
+    ]
+    for pattern in injection_patterns:
+        if re.search(pattern, cleaned, re.IGNORECASE):
+            raise ValueError("检测到潜在的注入攻击")
+
+    return cleaned
+
+def create_safe_prompt(user_input: str) -> str:
+    """创建安全的提示"""
+    cleaned = validate_input(user_input)
+    return f"请回答以下问题：{cleaned}"</code></pre>
+                </div>
+
+                <h2>监控与可观测性</h2>
+
+                <pre class="mermaid">graph TD
+    A[应用] --> B[LangSmith 追踪]
+    A --> C[日志记录]
+    A --> D[指标监控]
+    B --> E[调用链可视化]
+    B --> F[性能分析]
+    C --> G[错误日志]
+    D --> H[Token 使用]
+    D --> I[延迟监控]</code></pre>
+
+                <h2>v0.1 → v1.0 迁移指南</h2>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>v0.1</th>
+                        <th>v1.0</th>
+                        <th>迁移方式</th>
+                    </tr>
+                    <tr>
+                        <td><code>initialize_agent</code></td>
+                        <td><code>create_agent</code></td>
+                        <td>重写 Agent 创建逻辑</td>
+                    </tr>
+                    <tr>
+                        <td><code>LLMChain</code></td>
+                        <td><code>|</code> (LCEL)</td>
+                        <td>使用 <code>|</code> 重写链</td>
+                    </tr>
+                    <tr>
+                        <td><code>ConversationChain</code></td>
+                        <td><code>MessagesPlaceholder</code></td>
+                        <td>使用新提示模板</td>
+                    </tr>
+                    <tr>
+                        <td><code>Tool.from_function</code></td>
+                        <td><code>@tool</code></td>
+                        <td>使用装饰器重写</td>
+                    </tr>
+                    <tr>
+                        <td><code>langchain.llms</code></td>
+                        <td><code>langchain_openai</code></td>
+                        <td>更新导入路径</td>
+                    </tr>
+                </table>
+
+                <div class="tip" data-label="迁移提示">
+                    使用 <code>langchain-classic</code> 包可以暂时保持兼容，但建议尽快迁移到 v1.0 新 API。
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="09-retrieval.html" class="prev">← RAG检索</a>
+                    <a href="index.html" class="next">返回目录 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. init_chat_model() 的主要优势是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 更快的推理速度</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 更低的成本</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 提供商无关的统一初始化接口</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 自动优化提示词</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. InMemoryRateLimiter 使用什么算法控制速率？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 漏桶算法</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 令牌桶算法</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 固定窗口计数</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 滑动窗口计数</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. configurable_fields 允许做什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 编译时配置模型</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 运行时动态配置模型参数</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 自动选择最优模型</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 限制模型输出长度</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全以下可配置模型的代码
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                            </div>
+                            <pre><code class="language-python">result = llm.invoke(
+    "写一首诗",
+    config={"______": {
+        "llm_temperature": 0.9,
+        "llm_model": "gpt-4o-mini"
+    }}
+)</code></pre>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                                <code>configurable</code>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            5. 代理配置应该在哪里设置最合适？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 在操作系统网络设置中</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 只能使用环境变量</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 环境变量或 http_client 参数</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 不支持代理配置</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            6. 实现一个完整的预算控制系统，包含速率限制和成本追踪
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain.callbacks import get_openai_callback
+from langchain_core.rate_limiters import InMemoryRateLimiter
+
+class BudgetControlledLLM:
+    def __init__(self, model: str, budget: float, rate_limit: float):
+        self.model = model
+        self.budget = budget
+        self.spent = 0.0
+        self.rate_limiter = InMemoryRateLimiter(
+            requests_per_second=rate_limit
+        )
+        self.llm = ChatOpenAI(
+            model=model,
+            rate_limiter=self.rate_limiter
+        )
+        self.prices = {
+            "gpt-4o": {"input": 0.005, "output": 0.015},
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006}
+        }
+
+    def invoke(self, prompt: str):
+        """带预算控制的调用"""
+        # 检查预算
+        if self.spent >= self.budget:
+            raise Exception(f"预算已用尽: ${self.spent:.4f}/${self.budget:.4f}")
+
+        # 调用并追踪成本
+        with get_openai_callback() as cb:
+            result = self.llm.invoke(prompt)
+
+            # 更新花费
+            prices = self.prices.get(self.model, {"input": 0, "output": 0})
+            cost = (cb.prompt_tokens / 1000 * prices["input"] +
+                   cb.completion_tokens / 1000 * prices["output"])
+            self.spent += cost
+
+            print(f"本次成本: ${cost:.6f}, 总花费: ${self.spent:.4f}/${self.budget:.4f}")
+            return result
+
+# 使用
+llm = BudgetControlledLLM("gpt-4o", budget=1.0, rate_limit=0.5)
+
+for i in range(10):
+    try:
+        result = llm.invoke(f"问题 {i}")
+    except Exception as e:
+        print(e)
+        break</code></pre>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            7. 你需要为一个企业设计生产环境配置，要求：高可用、成本可控、安全合规
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考方案</summary>
+                            <div style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                                <strong>方案要点：</strong>
+                                <ul>
+                                    <li><strong>高可用</strong>：配置 fallback 到备用模型和提供商，实施重试机制</li>
+                                    <li><strong>速率限制</strong>：使用 InMemoryRateLimiter 控制 API 调用频率</li>
+                                    <li><strong>成本控制</strong>：设置预算上限，使用 get_openai_callback 追踪成本</li>
+                                    <li><strong>输入验证</strong>：严格验证用户输入，防止提示注入攻击</li>
+                                    <li><strong>代理配置</strong>：通过代理服务器访问外部 API</li>
+                                    <li><strong>监控</strong>：使用自定义回调记录 Token 使用和调用链路</li>
+                                    <li><strong>缓存</strong>：使用 Redis 缓存常见查询，减少 API 调用</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            8. 哪个回调方法在每个新 token 时被调用？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. on_llm_start</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. on_llm_end</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. on_llm_new_token</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. on_chain_start</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

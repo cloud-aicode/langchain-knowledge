@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆管理 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-memory">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>记忆管理 (Memory)</h1>
+                <p class="subtitle">维护对话上下文和历史</p>
+
+                <h2>基础消息历史</h2>
+
+                <p>LangChain 1.0 使用 <code>InMemoryChatMessageHistory</code> 管理对话历史：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.chat_history import InMemoryChatMessageHistory
+
+# 创建历史记录
+history = InMemoryChatMessageHistory()
+
+# 添加消息
+history.add_user_message("你好")
+history.add_ai_message("你好！有什么可以帮助你的？")
+history.add_user_message("你知道 Python 吗？")
+history.add_ai_message("是的，Python 是一种高级编程语言...")
+
+# 获取所有消息
+all_messages = history.messages
+for msg in all_messages:
+    print(f"{msg.type}: {msg.content}")
+
+# 清除历史
+history.clear()</code></pre>
+                </div>
+
+                <h2>经典 Memory 类型</h2>
+
+                <p>LangChain 提供多种 Memory 类型，适用于不同场景：</p>
+
+                <pre class="mermaid">graph TD
+    A[Memory 类型选择] --> B{对话长度}
+    B -->|短对话| C[ConversationBufferMemory]
+    B -->|长对话| D{Token 限制}
+    D -->|有限制| E[ConversationTokenBufferMemory]
+    D -->|无限制| F{需要摘要?}
+    F -->|是| G[ConversationSummaryMemory]
+    F -->|否| H[ConversationBufferWindowMemory]</code></pre>
+
+                <h3>ConversationBufferMemory</h3>
+                <p>最简单的 Memory 类型，缓存所有历史消息：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.memory import ConversationBufferMemory
+from langchain_openai import ChatOpenAI
+
+# 创建 Buffer Memory
+memory = ConversationBufferMemory(
+    return_messages=True,  # 返回消息对象而非字符串
+    human_prefix="Human",
+    ai_prefix="AI"
+)
+
+# 保存上下文
+memory.save_context(
+    {"input": "我叫张三"},
+    {"output": "你好张三，很高兴认识你！"}
+)
+
+memory.save_context(
+    {"input": "我喜欢编程"},
+    {"output": "编程是一项很有趣的技能"}
+)
+
+# 加载历史
+history = memory.load_memory_variables({})
+print(history["history"])</code></pre>
+                </div>
+
+                <h3>ConversationBufferWindowMemory</h3>
+                <p>只保留最近 K 轮对话，自动丢弃更早的消息：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.memory import ConversationBufferWindowMemory
+
+# 创建窗口 Memory（保留最近 3 轮）
+memory = ConversationBufferWindowMemory(
+    k=3,  # 只保留最近 3 轮对话
+    return_messages=True
+)
+
+# 添加 5 轮对话
+for i in range(5):
+    memory.save_context(
+        {"input": f"问题 {i}"},
+        {"output": f"回答 {i}"}
+    )
+
+# 只会保留最近 3 轮（2, 3, 4）
+history = memory.load_memory_variables({})
+print(f"保留轮数: {len(history['history'])}")  # 6 条消息 = 3 轮</code></pre>
+                </div>
+
+                <div class="tip" data-label="适用场景">
+                    ConversationBufferWindowMemory 适合：Token 预算有限、不需要长期记忆的场景。
+                </div>
+
+                <h3>ConversationSummaryMemory</h3>
+                <p>使用 LLM 对历史进行摘要压缩，节省 Token：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.memory import ConversationSummaryMemory
+from langchain_openai import ChatOpenAI
+
+# 创建摘要 Memory
+llm = ChatOpenAI(model="gpt-4o")
+
+memory = ConversationSummaryMemory(
+    llm=llm,
+    return_messages=True,
+    max_token_limit=300  # 摘要的最大 Token 数
+)
+
+# 添加对话历史
+memory.save_context(
+    {"input": "我叫张三，是一名软件工程师"},
+    {"output": "你好张三！很高兴认识一位软件工程师。"}
+)
+
+memory.save_context(
+    {"input": "我主要使用 Python 和 Java 开发后端服务"},
+    {"output": "Python 和 Java 都是优秀的后端开发语言。"}
+)
+
+# 获取摘要
+history = memory.load_memory_variables({})
+print(history["history"])
+# 输出: SystemMessage(content="张三是一位软件工程师，主要使用 Python 和 Java 进行后端开发...")
+
+# 继续对话时，摘要会自动更新
+memory.save_context(
+    {"input": "我最近在学习 LangChain"},
+    {"output": "LangChain 是一个用于构建 LLM 应用的框架，很适合你学习！"}
+)</code></pre>
+                </div>
+
+                <div class="note" data-label="摘要策略">
+                    ConversationSummaryMemory 会自动将旧对话合并为摘要，新对话保持原始形式。这样既保留了关键信息，又节省了 Token。
+                </div>
+
+                <h3>ConversationTokenBufferMemory</h3>
+                <p>基于 Token 限制的滑动窗口：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.memory import ConversationTokenBufferMemory
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 创建 Token 限制 Memory
+memory = ConversationTokenBufferMemory(
+    llm=llm,
+    max_token_limit=500,  # 最多保留 500 tokens
+    return_messages=True
+)
+
+# 添加对话（会自动裁剪以符合 Token 限制）
+for i in range(10):
+    memory.save_context(
+        {"input": f"问题 {i}" * 20},
+        {"output": f"回答 {i}" * 20}
+    )
+
+# 会被裁剪到约 500 tokens
+history = memory.load_memory_variables({})
+print(f"当前 Token 数: {llm.get_num_tokens_from_messages(history['history'])}")</code></pre>
+                </div>
+
+                <h2>RunnableWithMessageHistory（v1.0 推荐）</h2>
+
+                <p>LangChain 1.0 推荐使用 <code>RunnableWithMessageHistory</code> 管理对话历史：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+from langchain_core.output_parsers import StrOutputParser
+
+# 存储多个会话的历史
+store = {}
+
+def get_session_history(session_id: str):
+    """获取或创建会话历史"""
+    if session_id not in store:
+        store[session_id] = InMemoryChatMessageHistory()
+    return store[session_id]
+
+# 创建带历史的提示模板
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手。请记住用户告诉你的信息。"),
+    MessagesPlaceholder(variable="chat_history"),  # 历史消息占位符
+    ("user", "{input}")
+])
+
+# 创建链
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm | StrOutputParser()
+
+# 包装为支持历史的可运行对象
+with_history = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="chat_history"
+)
+
+# 使用：不同 session_id 独立
+response1 = with_history.invoke(
+    {"input": "你好，我叫小明"},
+    config={"configurable": {"session_id": "user-123"}}
+)
+print(response1)  # 你好小明！
+
+response2 = with_history.invoke(
+    {"input": "我叫什么名字？"},
+    config={"configurable": {"session_id": "user-123"}}
+)
+print(response2)  # 你叫小明
+
+# 不同 session_id 不共享历史
+response3 = with_history.invoke(
+    {"input": "我叫什么名字？"},
+    config={"configurable": {"session_id": "user-456"}}
+)
+print(response3)  # 我不知道你的名字</code></pre>
+                </div>
+
+                <div class="tip" data-label="v1.0 推荐方式">
+                    RunnableWithMessageHistory 是 LangChain 1.0 推荐的方式，它：
+                    <br>• 与 LCEL 无缝集成
+                    <br>• 支持多会话管理
+                    <br>• 自动处理历史保存和加载
+                </div>
+
+                <h2>持久化存储</h2>
+
+                <h3>Redis 持久化（详细配置）</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.chat_history import RedisChatMessageHistory
+import redis
+
+# 方式一：基础连接
+history = RedisChatMessageHistory(
+    session_id="user-session-123",
+    url="redis://localhost:6379/0",
+    ttl=3600  # 1 小时过期
+)
+
+# 方式二：使用连接池（推荐生产环境）
+redis_pool = redis.ConnectionPool(
+    host='localhost',
+    port=6379,
+    db=0,
+    decode_responses=True,
+    max_connections=50,
+    socket_connect_timeout=5,
+    socket_timeout=5
+)
+
+history = RedisChatMessageHistory(
+    session_id="user-session-456",
+    redis_pool=redis_pool,
+    ttl=7200,  # 2 小时过期
+    key_prefix="langchain:chat:"  # 键前缀
+)
+
+# 使用方式与内存版本相同
+history.add_user_message("你好")
+history.add_ai_message("你好！")
+messages = history.messages</code></pre>
+                </div>
+
+                <h3>PostgreSQL 持久化（详细配置）</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.chat_history import PostgreSQLChatMessageHistory
+
+# 方式一：同步连接
+history = PostgreSQLChatMessageHistory(
+    connection_string="postgresql://user:pass@localhost:5432/langchain",
+    session_id="user-session-789",
+    table_name="chat_history"  # 自定义表名
+)
+
+# 方式二：异步连接（推荐）
+history = PostgreSQLChatMessageHistory(
+    connection_string="postgresql+asyncpg://user:pass@localhost:5432/langchain",
+    session_id="user-session-abc",
+    table_name="chat_history",
+    create_table=True,  # 自动创建表
+    ttl=3600  # 1 小时过期
+)
+
+# 使用
+history.add_user_message("Hello")
+history.add_ai_message("Hi!")
+messages = history.messages</code></pre>
+                </div>
+
+                <pre class="mermaid">graph TD
+    A[用户消息] --> B[RunnableWithMessageHistory]
+    B --> C[获取 session_id]
+    C --> D{会话存在?}
+    D -->|是| E[加载历史]
+    D -->|否| F[创建新会话]
+    E --> G[构建完整消息]
+    F --> G
+    G --> H[调用 LLM]
+    H --> I[保存新消息]
+    I --> J[Redis/PostgreSQL]
+    J --> K[返回响应]</code></pre>
+
+                <h2>记忆压缩策略</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.memory import ConversationSummaryMemory
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 自定义摘要提示
+summary_prompt = PromptTemplate(
+    input_variables=["summary", "new_lines"],
+    template="""将以下对话历史压缩为简洁的摘要：
+
+当前摘要: {summary}
+
+新对话:
+{new_lines}
+
+请生成新的摘要（保留关键信息，去除重复）:"""
+)
+
+memory = ConversationSummaryMemory(
+    llm=llm,
+    prompt=summary_prompt,
+    max_token_limit=500,
+    return_messages=True
+)
+
+# 批量添加历史
+conversations = [
+    ("我叫张三", "你好张三！"),
+    ("我是一名工程师", "工程师是一个很好的职业。"),
+    ("我在北京工作", "北京是中国的首都。"),
+    ("我喜欢编程", "编程是很有趣的技能。"),
+    ("我主要用 Python", "Python 是一门优秀的语言。"),
+]
+
+for user_msg, ai_msg in conversations:
+    memory.save_context(
+        {"input": user_msg},
+        {"output": ai_msg}
+    )
+
+# 获取压缩后的摘要
+history = memory.load_memory_variables({})
+print(history["history"])
+# 输出: 张三是一名在北京工作的工程师，主要使用 Python 进行编程开发...</code></pre>
+                </div>
+
+                <h2>多会话管理</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+# 多会话存储
+sessions = {}
+
+def get_session_history(session_id: str):
+    if session_id not in sessions:
+        sessions[session_id] = InMemoryChatMessageHistory()
+    return sessions[session_id]
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手。"),
+    MessagesPlaceholder(variable="chat_history"),
+    ("user", "{input}")
+])
+
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+with_history = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="chat_history"
+)
+
+# 模拟多个用户同时对话
+users = ["alice", "bob", "charlie"]
+for user in users:
+    response = with_history.invoke(
+        {"input": f"你好，我是 {user}"},
+        config={"configurable": {"session_id": user}}
+    )
+    print(f"{user}: {response}")
+
+# 每个用户的会话是独立的
+for user in users:
+    response = with_history.invoke(
+        {"input": "我叫什么名字？"},
+        config={"configurable": {"session_id": user}}
+    )
+    print(f"{user} 记得自己的名字: {response}")</code></pre>
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="06-tools.html" class="prev">← 工具系统</a>
+                    <a href="08-embeddings.html" class="next">嵌入向量 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 哪种 Memory 类型适合 Token 有限的场景？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. ConversationBufferMemory</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. ConversationBufferWindowMemory</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. ConversationTokenBufferMemory</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. ConversationKGMemory</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. RunnableWithMessageHistory 的主要作用是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 压缩对话历史</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 为链添加对话历史管理</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 存储用户配置</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 加速 LLM 推理</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. ConversationBufferWindowMemory 的 k=3 表示什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 保留 3 条消息</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 保留最近 3 轮对话</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 保留 3 个 Token</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 保留 3 天历史</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            4. ConversationSummaryMemory 的摘要由谁生成？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 规则模板</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 统计算法</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. LLM 生成</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 用户手动编写</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            5. 补全 RunnableWithMessageHistory 的配置
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                            </div>
+                            <pre><code class="language-python">with_history = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="______",
+    history_messages_key="______"
+)</code></pre>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                                <code>input</code> 和 <code>chat_history</code>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            6. Redis 持久化中的 ttl 参数表示什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 总 Token 数</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 最大连接数</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 过期时间（秒）</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 超时时间</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            7. 实现一个使用 Redis 持久化的多轮对话系统
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.chat_history import RedisChatMessageHistory
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+import redis
+
+# Redis 连接池
+redis_pool = redis.ConnectionPool(
+    host='localhost',
+    port=6379,
+    db=0,
+    decode_responses=True,
+    max_connections=50
+)
+
+def get_session_history(session_id: str):
+    return RedisChatMessageHistory(
+        session_id=session_id,
+        redis_pool=redis_pool,
+        ttl=3600
+    )
+
+# 创建带历史的链
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手。"),
+    MessagesPlaceholder(variable="chat_history"),
+    ("user", "{input}")
+])
+
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+with_history = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="chat_history"
+)
+
+# 使用
+while True:
+    user_input = input("用户: ")
+    if user_input.lower() == 'exit':
+        break
+
+    response = with_history.invoke(
+        {"input": user_input},
+        config={"configurable": {"session_id": "user-123"}}
+    )
+    print(f"助手: {response.content}")</code></pre>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            8. 你需要为一个大客服系统设计记忆方案，每天处理 10 万用户对话，如何设计？
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考方案</summary>
+                            <div style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                                <strong>方案要点：</strong>
+                                <ul>
+                                    <li><strong>持久化存储</strong>：使用 Redis Cluster 存储会话历史，支持水平扩展</li>
+                                    <li><strong>Memory 类型</strong>：ConversationBufferWindowMemory(k=10) + 异步摘要到长期存储</li>
+                                    <li><strong>TTL 策略</strong>：活跃会话 24 小时过期，非活跃会话 2 小时</li>
+                                    <li><strong>摘要归档</strong>：超过 20 轮的对话自动摘要并存入 PostgreSQL</li>
+                                    <li><strong>冷热分离</strong>：最近 10 轮在 Redis，更早的摘要在数据库</li>
+                                    <li><strong>会话清理</strong>：定时任务清理过期会话，释放内存</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

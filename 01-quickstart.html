@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快速入门 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-quickstart">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>快速入门</h1>
+                <p class="subtitle">10 分钟上手 LangChain 1.0</p>
+
+                <h2>什么是 LangChain？</h2>
+                <p>LangChain 是一个开源框架，用于快速构建由大语言模型（LLM）驱动的应用程序。它提供：</p>
+                <ul>
+                    <li><strong>预构建架构</strong>：智能体和应用的标准组件</li>
+                    <li><strong>模型集成</strong>：统一接口连接 OpenAI、Anthropic、Google 等模型</li>
+                    <li><strong>工具生态</strong>：丰富的外部服务集成</li>
+                    <li><strong>生产就绪</strong>：被 Uber、LinkedIn、Klarna 等大公司验证</li>
+                </ul>
+
+                <h2>安装配置</h2>
+
+                <h3>基础安装</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">bash</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># 核心包
+pip install langchain
+
+# OpenAI 集成
+pip install langchain-openai
+
+# Anthropic 集成
+pip install langchain-anthropic
+
+# Google 集成
+pip install langchain-google</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    LangChain 1.0 重新设计了包架构。核心功能在 <code>langchain</code> 包中，核心接口在 <code>langchain-core</code> 中。旧代码被移至 <code>langchain-classic</code>。
+                </div>
+
+                <h2>LangChain 1.0 包架构</h2>
+
+                <pre class="mermaid">graph TD
+    A[langchain] --> B[主入口包]
+    A --> C[智能体实现]
+    A --> D[预构建组件]
+
+    E[langchain-core] --> F[核心接口]
+    E --> G[Runnable抽象]
+    E --> H[跨包基础类型]
+
+    I[langchain-classic] --> J[遗留代码]
+    I --> K[向后兼容]
+
+    L[langchain-openai] --> M[OpenAI集成]
+    N[langchain-anthropic] --> O[Anthropic集成]
+    P[langchain-google] --> Q[Google集成]</code></pre>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>包名</th>
+                        <th>用途</th>
+                        <th>必需</th>
+                    </tr>
+                    <tr>
+                        <td><code>langchain</code></td>
+                        <td>主入口，包含所有 LLM 应用实现</td>
+                        <td>✓ 必需</td>
+                    </tr>
+                    <tr>
+                        <td><code>langchain-core</code></td>
+                        <td>核心接口和抽象</td>
+                        <td>✓ 必需（自动安装）</td>
+                    </tr>
+                    <tr>
+                        <td><code>langchain-openai</code></td>
+                        <td>OpenAI 模型集成</td>
+                        <td>可选</td>
+                    </tr>
+                    <tr>
+                        <td><code>langchain-anthropic</code></td>
+                        <td>Anthropic 模型集成</td>
+                        <td>可选</td>
+                    </tr>
+                    <tr>
+                        <td><code>langchain-classic</code></td>
+                        <td>遗留的 0.1.x 版本代码</td>
+                        <td>可选（迁移时使用）</td>
+                    </tr>
+                </table>
+
+                <h2>第一个智能体</h2>
+                <p>LangChain 1.0 引入新的 <code>create_agent</code> 方法，简化智能体创建：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import os
+from langchain import ChatOpenAI
+from langchain.agents import create_tool_calling_agent, Tool
+from langchain_core.tools import tool
+
+# 1. 设置 API Key
+os.environ["OPENAI_API_KEY"] = "your-api-key"
+
+# 2. 定义工具
+@tool
+def get_weather(location: str) -> str:
+    """获取指定位置的天气信息"""
+    return f"{location}今天天气晴朗，温度 25°C"
+
+@tool
+def calculate(expression: str) -> str:
+    """计算数学表达式"""
+    try:
+        result = eval(expression)
+        return f"结果: {result}"
+    except:
+        return "计算错误"
+
+# 3. 创建模型
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# 4. 创建智能体
+tools = [get_weather, calculate]
+agent = create_tool_calling_agent(
+    llm,
+    tools,
+    system_prompt="你是一个有帮助的助手，可以使用工具回答问题。"
+)
+
+# 5. 运行智能体
+response = agent.invoke({
+    "messages": [
+        {"role": "user", "content": "北京今天的天气怎么样？"}
+    ]
+})
+
+print(response["messages"][-1].content)</code></pre>
+                </div>
+
+                <div class="tip" data-label="提示">
+                    <code>create_tool_calling_agent</code> 是 LangChain 1.0 推荐的创建智能体的标准方式，它会自动为模型启用工具调用功能。
+                </div>
+
+                <h2>智能体执行流程</h2>
+
+                <pre class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant A as Agent
+    participant LLM as LLM
+    participant T as 工具
+
+    U->>A: 发送消息
+    A->>LLM: 调用模型(带工具定义)
+    LLM->>A: 返回工具调用请求
+    A->>T: 执行工具
+    T->>A: 返回工具结果
+    A->>LLM: 将结果传回模型
+    LLM->>A: 生成最终回复
+    A->>U: 返回响应</code></pre>
+
+                <h2>v1.0 主要变化</h2>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>方面</th>
+                        <th>v0.1.x</th>
+                        <th>v1.0</th>
+                    </tr>
+                    <tr>
+                        <td>智能体创建</td>
+                        <td><code>initialize_agent</code></td>
+                        <td><code>create_agent</code> / <code>create_tool_calling_agent</code></td>
+                    </tr>
+                    <tr>
+                        <td>链定义</td>
+                        <td><code>LLMChain</code></td>
+                        <td><code>|</code> 语法 (LCEL)</td>
+                    </tr>
+                    <tr>
+                        <td>模型导入</td>
+                        <td><code>langchain.llms</code></td>
+                        <td><code>langchain_openai</code> 等</td>
+                    </tr>
+                    <tr>
+                        <td>工具定义</td>
+                        <td><code>Tool.from_function</code></td>
+                        <td><code>@tool</code> 装饰器</td>
+                    </tr>
+                    <tr>
+                        <td>遗留代码</td>
+                        <td>混在主包中</td>
+                        <td>移至 <code>langchain-classic</code></td>
+                    </tr>
+                </table>
+
+                <h2>基础概念速览</h2>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                    <div style="padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">🤖</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Models</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">LLM 和 ChatModel 统一接口</div>
+                    </div>
+                    <div style="padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">💬</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Prompts</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">提示模板和输出解析</div>
+                    </div>
+                    <div style="padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">⛓️</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Chains</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">用 LCEL 编排工作流</div>
+                    </div>
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">🎯</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Agents</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">自主决策的智能体</div>
+                    </div>
+                    <div style="padding: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">🔧</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Tools</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">外部功能集成</div>
+                    </div>
+                    <div style="padding: 15px; background: rgba(6, 182, 212, 0.1); border-radius: 10px;">
+                        <div style="font-size: 1.5rem;">🧠</div>
+                        <div style="font-weight: 600; margin-top: 8px;">Memory</div>
+                        <div style="font-size: 0.85rem; color: rgba(0,0,0,0.6);">对话状态管理</div>
+                    </div>
+                </div>
+
+                <h2>下一步</h2>
+                <ul>
+                    <li>📖 学习 <a href="02-models.html" style="color: var(--primary-color);">模型模块</a>：深入了解模型使用</li>
+                    <li>💬 学习 <a href="03-prompts.html" style="color: var(--primary-color);">提示工程</a>：掌握提示技巧</li>
+                    <li>⛓️ 学习 <a href="04-chains.html" style="color: var(--primary-color);">链式调用</a>：构建复杂流程</li>
+                </ul>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. LangChain 1.0 中创建智能体的推荐方法是？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. initialize_agent</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. create_agent</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. AgentExecutor</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. LLMSingleActionAgent</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 以下哪个包是 LangChain 1.0 的核心入口包？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. langchain-core</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. langchain</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. langchain-community</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. langchain-classic</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            3. 补全以下代码，创建一个 OpenAI 模型实例
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langchain________ ChatOpenAI
+
+llm = ChatOpenAI________="gpt-4o"</code></pre>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <pre><code class="language-python">from langchain import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")</code></pre>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            4. 创建一个简单的智能体，包含两个工具：获取当前时间和计算两个数的和
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain import ChatOpenAI
+from langchain.agents import create_tool_calling_agent
+from langchain_core.tools import tool
+from datetime import datetime
+
+@tool
+def get_current_time() -> str:
+    """获取当前时间"""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+@tool
+def add_numbers(a: int, b: int) -> int:
+    """计算两个数的和"""
+    return a + b
+
+llm = ChatOpenAI(model="gpt-4o")
+tools = [get_current_time, add_numbers]
+
+agent = create_tool_calling_agent(
+    llm,
+    tools,
+    system_prompt="你是一个有帮助的助手。"
+)
+
+# 测试
+response = agent.invoke({
+    "messages": [
+        {"role": "user", "content": "现在几点了？"}
+    ]
+})
+print(response["messages"][-1].content)</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="index.html" class="prev">← 返回目录</a>
+                    <a href="02-models.html" class="next">模型模块 →</a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

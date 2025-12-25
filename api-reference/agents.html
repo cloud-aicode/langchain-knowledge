@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能体 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-agents">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>智能体 API</h1>
+                <p class="subtitle">Agent 创建与执行</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#functions" class="api-nav-link">创建函数</a>
+                    <a href="#executor" class="api-nav-link">执行器</a>
+                    <a href="#types" class="api-nav-link">Agent 类型</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>LangChain 的智能体系统使用 LLM 决定调用哪些工具来完成任务。核心组件包括 Agent（决策）和 AgentExecutor（执行）。</p>
+
+                <pre class="mermaid">graph TD
+                    A[用户输入] --> B[Agent]
+                    B --> C{决策}
+                    C -->|需要工具| D[调用工具]
+                    C -->|完成| E[返回结果]
+                    D --> F[获取工具结果]
+                    F --> B
+                    B --> G[观察结果]
+                    G --> C
+
+                    style B fill:#e1f5fe
+                    style D fill:#c8e6c9</code></pre>
+
+                <h2 id="functions">创建函数</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_tool_calling_agent</h3>
+                    <p class="api-description">创建工具调用类型的 Agent（推荐）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
+
+def create_tool_calling_agent(
+    llm: BaseChatModel,
+    tools: Sequence[Union[BaseTool, StructuredTool, callable]],
+    prompt: ChatPromptTemplate,
+    *,
+    tool_names: Optional[List[str]] = None,
+    strict: bool = False,
+) -> Runnable:
+    """
+    创建工具调用 Agent
+
+    Args:
+        llm: 聊天模型（需要支持工具调用）
+        tools: 工具列表
+        prompt: Agent 提示模板
+        tool_names: 可选的工具名称过滤
+        strict: 是否严格模式（只使用提供的工具）
+
+    Returns:
+        可运行的 Agent
+
+    Example:
+        from langchain_openai import ChatOpenAI
+        from langchain_core.tools import tool
+        from langchain.agents import AgentExecutor
+
+        @tool
+        def search(query: str) -> str:
+            return "搜索结果"
+
+        llm = ChatOpenAI(model="gpt-4o")
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a helpful assistant"),
+            ("placeholder", "{chat_history}"),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        agent = create_tool_calling_agent(llm, [search], prompt)
+        agent_executor = AgentExecutor(
+            agent=agent,
+            tools=[search],
+            verbose=True
+        )
+        result = agent_executor.invoke({"input": "搜索 Python"})
+    """</code></pre>
+                    </div>
+
+                    <h4>提示模板要求</h4>
+                    <p>提示模板必须包含以下占位符：</p>
+                    <ul>
+                        <li><code>{chat_history}</code> - 对话历史（可选）</li>
+                        <li><code>{input}</code> - 用户输入</li>
+                        <li><code>{agent_scratchpad}</code> - Agent 思考过程（必需）</li>
+                    </ul>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_react_agent</h3>
+                    <p class="api-description">创建 ReAct 类型的 Agent（推理 + 行动）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_react_agent
+
+def create_react_agent(
+    llm: BaseLanguageModel,
+    tools: Sequence[BaseTool],
+    prompt: PromptTemplate,
+) -> Runnable:
+    """
+    创建 ReAct Agent
+
+    Args:
+        llm: 语言模型
+        tools: 工具列表
+        prompt: 提示模板（需包含特定格式）
+
+    Returns:
+        ReAct Agent
+
+    Note:
+        ReAct Agent 使用 Thought-Action-Observation 循环
+    """</code></pre>
+                    </div>
+
+                    <h4>ReAct 提示格式</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import PromptTemplate
+
+template = """Answer the following questions as best you can.
+You have access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought: {agent_scratchpad}"""
+
+prompt = PromptTemplate.from_template(template)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_structured_chat_agent</h3>
+                    <p class="api-description">创建结构化聊天 Agent。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_structured_chat_agent
+
+def create_structured_chat_agent(
+    llm: BaseLanguageModel,
+    tools: Sequence[BaseTool],
+    prompt: ChatPromptTemplate,
+) -> Runnable:
+    """
+    创建结构化聊天 Agent
+
+    Args:
+        llm: 语言模型
+        tools: 工具列表
+        prompt: 聊天提示模板
+
+    Returns:
+        结构化聊天 Agent
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_json_agent</h3>
+                    <p class="api-description">创建 JSON 格式的 Agent。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_json_agent
+
+def create_json_agent(
+    llm: BaseLanguageModel,
+    tools: Sequence[BaseTool],
+    prompt: PromptTemplate,
+    *,
+    stop_sequence: List[str] = ["\nObservation:"],
+) -> Runnable:
+    """
+    创建 JSON Agent
+
+    Args:
+        llm: 语言模型
+        tools: 工具列表
+        prompt: 提示模板
+        stop_sequence: 停止序列
+
+    Returns:
+        JSON Agent
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_openai_functions_agent</h3>
+                    <p class="api-description">创建 OpenAI Functions 类型的 Agent（已弃用，使用 create_tool_calling_agent）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_openai_functions_agent
+
+def create_openai_functions_agent(
+    llm: BaseChatModel,
+    tools: Sequence[BaseTool],
+    prompt: ChatPromptTemplate,
+) -> Runnable:
+    """
+    创建 OpenAI Functions Agent
+
+    Note: 已被 create_tool_calling_agent 取代
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">create_openai_tools_agent</h3>
+                    <p class="api-description">创建 OpenAI Tools 类型的 Agent（已弃用）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import create_openai_tools_agent
+
+def create_openai_tools_agent(
+    llm: BaseChatModel,
+    tools: Sequence[BaseTool],
+    prompt: ChatPromptTemplate,
+) -> Runnable:
+    """
+    创建 OpenAI Tools Agent
+
+    Note: 已被 create_tool_calling_agent 取代
+    """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="executor">执行器</h2>
+
+                <div class="api-section" id="agentexecutor">
+                    <h3 class="api-title">AgentExecutor</h3>
+                    <p class="api-description">Agent 执行器，负责运行 Agent 循环。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import AgentExecutor
+
+class AgentExecutor(Runnable[AgentInput, AgentOutput]):
+    """Agent 执行器"""
+
+    agent: Runnable[AgentInput, AgentActionOrFinish]
+    """Agent Runnable"""
+
+    tools: Dict[str, BaseTool]
+    """工具字典"""
+
+    max_iterations: int = 15
+    """最大迭代次数"""
+
+    max_execution_time: Optional[float] = None
+    """最大执行时间（秒）"""
+
+    early_stopping_method: Literal["force", "generate"] = "force"
+    """提前停止方法"""
+
+    verbose: bool = False
+    """是否打印详细日志"""
+
+    return_intermediate_steps: bool = False
+    """是否返回中间步骤"""
+
+    handle_parsing_errors: Union[bool, str, Callable[[Exception], str]] = True
+    """错误处理策略"""
+
+    callback_manager: Optional[CallbackManager] = None
+    """回调管理器"""
+
+    # 构造方法
+    def __init__(
+        self,
+        agent: Runnable[AgentInput, AgentActionOrFinish],
+        tools: Sequence[BaseTool],
+        *,
+        max_iterations: int = 15,
+        max_execution_time: Optional[float] = None,
+        early_stopping_method: str = "force",
+        verbose: bool = False,
+        return_intermediate_steps: bool = False,
+        handle_parsing_errors: Union[bool, str, Callable] = True,
+        **kwargs: Any,
+    ):
+        """
+        初始化执行器
+
+        Args:
+            agent: Agent Runnable
+            tools: 工具列表
+            max_iterations: 最大迭代次数
+            max_execution_time: 最大执行时间
+            early_stopping_method: 停止方法 ("force" 或 "generate")
+            verbose: 详细日志
+            return_intermediate_steps: 返回中间步骤
+            handle_parsing_errors: 错误处理
+        """</code></pre>
+                    </div>
+
+                    <h4>核心方法</h4>
+                    <div class="api-signature">
+                        <pre><code class="language-python">def invoke(
+    self,
+    input: AgentInput,
+    config: Optional[RunnableConfig] = None,
+    **kwargs: Any,
+) -> AgentOutput:
+    """
+    执行 Agent
+
+    Args:
+        input: 输入字典
+        config: 运行配置
+        **kwargs: 额外参数
+
+    Returns:
+        输出字典，包含:
+        - output: 最终输出
+        - intermediate_steps: 中间步骤（如果启用）
+    """
+
+def stream(
+    self,
+    input: AgentInput,
+    config: Optional[RunnableConfig] = None,
+    **kwargs: Any,
+) -> Iterator[AgentOutput]:
+    """流式执行"""
+
+async def ainvoke(
+    self,
+    input: AgentInput,
+    config: Optional[RunnableConfig] = None,
+    **kwargs: Any,
+) -> AgentOutput:
+    """异步执行"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+
+@tool
+def search(query: str) -> str:
+    """搜索网络"""
+    return f"关于 {query} 的搜索结果"
+
+@tool
+def calculator(expression: str) -> str:
+    """计算数学表达式"""
+    try:
+        return str(eval(expression))
+    except:
+        return "计算错误"
+
+# 创建 Agent
+llm = ChatOpenAI(model="gpt-4o")
+tools = [search, calculator]
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("placeholder", "{chat_history}"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+
+# 创建执行器
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    max_iterations=10,
+    return_intermediate_steps=True
+)
+
+# 执行
+result = agent_executor.invoke({"input": "搜索 Python 并计算 2+3"})
+print(result["output"])
+print(result["intermediate_steps"])</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="types">Agent 类型</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">AgentType 枚举</h3>
+                    <p class="api-description">预定义的 Agent 类型（部分已弃用）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import AgentType
+
+class AgentType(Enum):
+    """Agent 类型枚举"""
+
+    ZERO_SHOT_REACT_DESCRIPTION = "zero-shot-react-description"
+    """零样本 ReAct Agent"""
+
+    REACT_DOCSTORE = "react-docstore"
+    """文档存储 ReAct Agent"""
+
+    SELF_ASK_WITH_SEARCH = "self-ask-with-search"
+    """自问搜索 Agent"""
+
+    CONVERSATIONAL_REACT_DESCRIPTION = "conversational-react-description"
+    """对话 ReAct Agent"""
+
+    CHAT_ZERO_SHOT_REACT_DESCRIPTION = "chat-zero-shot-react-description"
+    """聊天零样本 ReAct Agent"""
+
+    CHAT_CONVERSATIONAL_REACT_DESCRIPTION = "chat-conversational-react-description"
+    """聊天对话 ReAct Agent"""
+
+    STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION = "structured-chat-zero-shot-react-description"
+    """结构化聊天零样本 ReAct Agent"""
+
+    OPENAI_FUNCTIONS = "openai-functions"
+    """OpenAI Functions Agent（已弃用）"""
+
+    OPENAI_MULTI_FUNCTIONS = "openai-multi-functions"
+    """OpenAI 多函数 Agent（已弃用）"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">AgentAction</h3>
+                    <p class="api-description">Agent 执行的动作。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import AgentAction
+
+class AgentAction(Serializable):
+    """Agent 动作"""
+
+    tool: str
+    """要调用的工具名称"""
+
+    tool_input: Union[str, dict]
+    """工具输入"""
+
+    log: str
+    """执行日志"""
+
+    def __init__(
+        self,
+        tool: str,
+        tool_input: Union[str, dict],
+        log: str,
+    ):
+        """
+        Args:
+            tool: 工具名称
+            tool_input: 工具输入
+            log: 日志
+        """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">AgentFinish</h3>
+                    <p class="api-description">Agent 完成状态。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.agents import AgentFinish
+
+class AgentFinish(Serializable):
+    """Agent 完成"""
+
+    return_values: dict
+    """返回值字典"""
+
+    log: str
+    """完成日志"""
+
+    def __init__(
+        self,
+        return_values: dict,
+        log: str,
+    ):
+        """
+        Args:
+            return_values: 返回值（通常包含 "output" 键）
+            log: 日志
+        """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">AgentStep</h3>
+                    <p class="api-description">单步执行结果。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from typing import Tuple, Union
+from langchain.agents import AgentAction, AgentFinish
+
+AgentStep = Tuple[AgentAction, str]
+"""Agent 步骤: (动作, 观察结果)"""</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+
+# ========== 示例1: 基础工具调用 Agent ==========
+
+@tool
+def get_weather(city: str) -> str:
+    """获取指定城市的天气"""
+    return f"{city} 今天是晴天，温度 25°C"
+
+@tool
+def get_time(city: str) -> str:
+    """获取指定城市的时间"""
+    from datetime import datetime
+    return f"{city} 现在是 {datetime.now().strftime('%H:%M')}"
+
+llm = ChatOpenAI(model="gpt-4o")
+tools = [get_weather, get_time]
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+result = agent_executor.invoke({"input": "北京的天气和时间"})
+
+# ========== 示例2: 带对话历史的 Agent ==========
+
+prompt_with_history = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("placeholder", "{chat_history}"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent_executor_history = AgentExecutor(
+    agent=create_tool_calling_agent(llm, tools, prompt_with_history),
+    tools=tools
+)
+
+from langchain_core.messages import HumanMessage, AIMessage
+
+chat_history = [
+    HumanMessage(content="你好"),
+    AIMessage(content="你好！有什么可以帮助你的？")
+]
+
+result = agent_executor_history.invoke({
+    "input": "北京天气怎么样？",
+    "chat_history": chat_history
+})
+
+# ========== 示例3: 流式执行 ==========
+
+async def stream_agent():
+    async for chunk in agent_executor.astream({"input": "北京天气"}):
+        print(chunk)
+
+import asyncio
+asyncio.run(stream_agent())
+
+# ========== 示例4: 自定义错误处理 ==========
+
+def handle_error(error: Exception) -> str:
+    return f"发生错误: {str(error)}。请尝试重新表述你的问题。"
+
+agent_executor_safe = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    handle_parsing_errors=handle_error
+)
+
+# ========== 示例5: 限制迭代次数 ==========
+
+agent_executor_limited = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    max_iterations=5
+)
+
+# ========== 示例6: 获取中间步骤 ==========
+
+agent_executor_debug = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    return_intermediate_steps=True,
+    verbose=True
+)
+
+result = agent_executor_debug.invoke({"input": "北京天气"})
+print("中间步骤:", result["intermediate_steps"])</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="tools.html">Tools API</a></li>
+                    <li><a href="chat-models.html">Chat Models API</a></li>
+                    <li><a href="../06-agents.html">教程：智能体</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="runnables.html">← Runnables API</a>
+                    <a href="tools.html" class="next">Tools API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

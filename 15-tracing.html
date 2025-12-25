@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链路追踪 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-tracing">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>链路追踪</h1>
+                <p class="subtitle">使用 LangSmith 追踪和调试 LangChain 应用</p>
+
+                <h2>什么是链路追踪？</h2>
+                <p>链路追踪（Tracing）让你完整记录 LangChain 应用的每次执行过程，包括：</p>
+                <ul>
+                    <li><strong>输入输出</strong>：每个组件的输入和输出</li>
+                    <li><strong>执行时间</strong>：每个步骤的耗时</li>
+                    <li><strong>Token 使用</strong>：精确的 token 统计</li>
+                    <li><strong>错误信息</strong>：失败的详细堆栈</li>
+                    <li><strong>调用链路</strong>：组件之间的调用关系</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    LangSmith 是 LangChain 官方的开发者平台，提供完整的追踪、调试和测试功能。
+                </div>
+
+                <h2>为什么需要追踪？</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>场景</th>
+                        <th>没有追踪</th>
+                        <th>有追踪</th>
+                    </tr>
+                    <tr>
+                        <td>调试问题</td>
+                        <td>❌ 不知道哪里出错</td>
+                        <td>✓ 精确定位失败步骤</td>
+                    </tr>
+                    <tr>
+                        <td>性能优化</td>
+                        <td>❌ 猜测哪里慢</td>
+                        <td>✓ 看到每个组件的耗时</td>
+                    </tr>
+                    <tr>
+                        <td>成本控制</td>
+                        <td>❌ 不知道 token 使用</td>
+                        <td>✓ 精确统计 token</td>
+                    </tr>
+                    <tr>
+                        <td>版本对比</td>
+                        <td>❌ 难以对比效果</td>
+                        <td>✓ 直接对比不同版本</td>
+                    </tr>
+                </table>
+
+                <h2>LangSmith 架构</h2>
+
+                <pre class="mermaid">graph LR
+    A[LangChain 应用] -->|发送追踪数据| B[LangSmith API]
+    B --> C[数据存储]
+    C --> D[可视化界面]
+
+    D --> E[查看执行链路]
+    D --> F[性能分析]
+    D --> G[Token 统计]
+    D --> H[对比不同版本]
+
+    style B fill:#c8e6c9
+    style D fill:#fff9c4</code></pre>
+
+                <h2>配置 LangSmith</h2>
+
+                <h3>1. 获取 API Key</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">bash</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-bash"># 访问 https://smith.langchain.com 注册账号
+# 获取 API Key 后设置环境变量
+export LANGCHAIN_TRACING_V2=true
+export LANGCHAIN_API_KEY="lsv2_your-api-key-here"
+export LANGCHAIN_PROJECT="my-awesome-project"</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    设置环境变量后，所有 LangChain 运行会自动发送追踪数据到 LangSmith。无需修改代码！
+                </div>
+
+                <h3>2. 代码中配置</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import os
+from langchain_openai import ChatOpenAI
+
+# 方式1：通过环境变量（推荐）
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "lsv2_your-key"
+os.environ["LANGCHAIN_PROJECT"] = "my-project"
+
+# 方式2：手动初始化
+from langchain_smith import LangSmithSmith
+
+# 追踪会自动启用
+llm = ChatOpenAI(model="gpt-4o")
+response = llm.invoke("你好")
+# 这次调用会被自动追踪</code></pre>
+                </div>
+
+                <h2>追踪数据示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+# 创建一个简单的链
+prompt = ChatPromptTemplate.from_template("讲一个关于{topic}的故事")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 执行 - 这次运行会被完整追踪
+response = chain.invoke({"topic": "太空探索"})
+
+# 在 LangSmith 界面中可以看到：
+# 1. 输入：{"topic": "太空探索"}
+# 2. Prompt 模板渲染后的结果
+# 3. 发送到 LLM 的完整消息
+# 4. LLM 的原始响应
+# 5. Token 使用统计
+# 6. 每个步骤的执行时间</code></pre>
+                </div>
+
+                <h2>手动追踪</h2>
+                <p>除了自动追踪，你还可以手动添加追踪信息：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.runnables import RunnableLambda
+import time
+
+# 自定义函数
+def process_input(inputs):
+    """处理输入的函数"""
+    time.sleep(1)  # 模拟处理
+    return {"processed": True, "original": inputs}
+
+# 创建链
+llm = ChatOpenAI(model="gpt-4o")
+chain = (
+    RunnableLambda(process_input) |
+    (lambda x: x["original"]["text"]) |
+    llm
+)
+
+# 执行 - 每个步骤都会被追踪
+response = chain.invoke({"text": "你好"})
+
+# 追踪数据会包含：
+# - process_input 函数的输入输出
+# - Lambda 转换的结果
+# - LLM 调用的详细信息</code></pre>
+                </div>
+
+                <h2>使用 run_name 标识运行</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 使用自定义运行名称
+response = llm.invoke(
+    "讲一个笑话",
+    config={
+        "run_name": "joke_generation",  # 在 LangSmith 中显示
+        "tags": ["entertainment", "joke"],  # 添加标签
+        "metadata": {  # 添加元数据
+            "user_id": "user_123",
+            "category": "entertainment"
+        }
+    }
+)
+
+# 在 LangSmith 中：
+# - 运行名称：joke_generation
+# - 标签：entertainment, joke
+# - 元数据：user_id, category</code></pre>
+                </div>
+
+                <h2>在 LangSmith 中查看追踪</h2>
+
+                <p>访问 LangSmith 控制台后，你可以：</p>
+
+                <ul>
+                    <li><strong>查看运行列表</strong>：所有执行记录按时间排序</li>
+                    <li><strong>过滤和搜索</strong>：按标签、元数据、状态筛选</li>
+                    <li><strong>查看详情</strong>：点击运行查看完整链路</li>
+                    <li><strong>对比运行</strong>：选择多个运行进行对比</li>
+                    <li><strong>性能分析</strong>：查看每个步骤的耗时占比</li>
+                </ul>
+
+                <h2>追踪数据流图</h2>
+
+                <pre class="mermaid">graph TD
+    A[用户请求] --> B[LangChain 应用]
+    B --> C{启用追踪?}
+
+    C -->|是| D[捕获输入]
+    C -->|否| E[正常执行]
+
+    D --> F[执行组件1]
+    F --> G[记录执行1]
+    G --> H[执行组件2]
+    H --> I[记录执行2]
+    I --> J[执行组件N]
+    J --> K[记录执行N]
+    K --> L[捕获输出]
+
+    L --> M[发送到 LangSmith]
+    E --> N[返回结果]
+    M --> N
+
+    style M fill:#c8e6c9
+    style D fill:#e1f5fe
+    style G fill:#e1f5fe
+    style I fill:#e1f5fe
+    style K fill:#e1f5fe</code></pre>
+
+                <h2>性能监控</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+import time
+
+# 创建一个复杂的链
+prompt = ChatPromptTemplate.from_template("分析：{text}")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 添加性能元数据
+start_time = time.time()
+
+response = chain.invoke(
+    {"text": "LangChain 是一个强大的框架"},
+    config={
+        "metadata": {
+            "test_case": "performance",
+            "start_time": start_time
+        }
+    }
+)
+
+# LangSmith 会自动记录：
+# - Prompt 渲染时间
+# - LLM API 请求时间
+# - 总执行时间
+# - Token 使用情况
+# - 成本估算</code></pre>
+                </div>
+
+                <h2>调试技巧</h2>
+
+                <div class="practice" data-label="调试建议">
+                    <h3>1. 使用有意义的 run_name</h3>
+                    <ul>
+                        <li>描述运行的目的（如 "story_generation"）</li>
+                        <li>包含版本信息（如 "v2_experiment"）</li>
+                        <li>便于后续筛选和分析</li>
+                    </ul>
+
+                    <h3>2. 添加有价值的元数据</h3>
+                    <ul>
+                        <li>用户 ID 或会话 ID</li>
+                        <li>测试案例名称</li>
+                        <li>实验配置参数</li>
+                        <li>任何有助于分类的信息</li>
+                    </ul>
+
+                    <h3>3. 使用标签进行分组</h3>
+                    <ul>
+                        <li>按功能分组（如 "rag", "agent"）</li>
+                        <li>按环境分组（如 "dev", "prod"）</li>
+                        <li>按实验类型分组（如 "baseline", "experiment"）</li>
+                    </ul>
+
+                    <h3>4. 对比不同版本</h3>
+                    <ul>
+                        <li>在 LangSmith 中选择多个运行</li>
+                        <li>对比输入输出、Token 使用、性能</li>
+                        <li>找出最佳配置</li>
+                    </ul>
+
+                    <h3>5. 设置监控告警</h3>
+                    <ul>
+                        <li>监控失败率</li>
+                        <li>监控延迟</li>
+                        <li>监控成本异常</li>
+                    </ul>
+                </div>
+
+                <h2>本地追踪（不使用 LangSmith）</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain callbacks import StdOutCallbackHandler
+
+# 使用标准输出回调进行本地追踪
+handler = StdOutCallbackHandler()
+
+llm = ChatOpenAI(model="gpt-4o")
+response = llm.invoke(
+    "你好",
+    config={"callbacks": [handler]}
+)
+
+# 输出：
+# [chain/start] Entering Chain run with input:...
+# [llm/start] Entering LLM run with input:...
+# [llm/end] Finished LLM run.
+# [chain/end] Finished Chain.</code></pre>
+                </div>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 生产环境始终启用追踪</h3>
+                    <ul>
+                        <li>帮助快速定位问题</li>
+                        <li>积累性能数据</li>
+                        <li>支持持续优化</li>
+                    </ul>
+
+                    <h3>2. 保护敏感信息</h3>
+                    <ul>
+                        <li>不要在追踪中记录敏感数据</li>
+                        <li>使用数据脱敏</li>
+                        <li>设置适当的数据保留策略</li>
+                    </ul>
+
+                    <h3>3. 合理组织项目</h3>
+                    <ul>
+                        <li>不同环境使用不同项目</li>
+                        <li>按功能模块划分</li>
+                        <li>定期清理过期数据</li>
+                    </ul>
+
+                    <h3>4. 利用对比功能</h3>
+                    <ul>
+                        <li>A/B 测试不同 Prompt</li>
+                        <li>对比不同模型</li>
+                        <li>验证优化效果</li>
+                    </ul>
+
+                    <h3>5. 与测试集成</h3>
+                    <ul>
+                        <li>自动追踪测试用例</li>
+                        <li>关联测试结果和追踪数据</li>
+                        <li>回归测试验证</li>
+                    </ul>
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. LangSmith 的主要功能是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 模型训练平台</div>
+                            <div class="option">B. 数据标注工具</div>
+                            <div class="option correct-option">C. LangChain 追踪和调试平台</div>
+                            <div class="option">D. 模型部署服务</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 启用 LangSmith 追踪需要设置哪个环境变量？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. LANGCHAIN_ENABLED=true</div>
+                            <div class="option">B. LANGCHAIN_TRACKING=true</div>
+                            <div class="option correct-option">C. LANGCHAIN_TRACING_V2=true</div>
+                            <div class="option">D. LANGSMITH_ENABLED=true</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. 在 config 中添加什么字段可以给运行命名？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. name</div>
+                            <div class="option">B. title</div>
+                            <div class="option correct-option">C. run_name</div>
+                            <div class="option">D. trace_name</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：配置带标签的追踪
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">response = llm.invoke(
+    "你好",
+    config={
+        "run_name": "greeting",
+        "____": ["test", "demo"],
+        "metadata": {"user_id": "user_123"}
+    }
+)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个链，配置追踪使其包含：运行名称 "story_generator"、标签 "creative"、"writing"
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你正在调试一个 RAG 系统，发现检索质量不稳定。你如何使用 LangSmith 来定位问题？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="14-streaming.html">← 上一章：流式处理</a>
+                    <a href="16-evaluation.html" class="next">下一章：评估框架 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 参考 - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-ref">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>API 参考</h1>
+                <p class="subtitle">LangChain Python API 完整参考手册</p>
+
+                <div class="tip" data-label="说明">
+                    本 API 参考基于 LangChain v0.3，涵盖核心模块和常用集成。每个 API 页面包含类/函数签名、参数说明、返回值和代码示例。
+                </div>
+
+                <h2>API 分类索引</h2>
+
+                <!-- 核心模块 -->
+                <div class="api-category">
+                    <h3>📦 核心模块</h3>
+                    <div class="api-grid">
+                        <a href="language-models.html" class="api-card">
+                            <div class="api-icon">🤖</div>
+                            <h4>Language Models</h4>
+                            <p>BaseLanguageModel、LLM 类</p>
+                        </a>
+                        <a href="chat-models.html" class="api-card">
+                            <div class="api-icon">💬</div>
+                            <h4>Chat Models</h4>
+                            <p>BaseChatModel、ChatOpenAI 等</p>
+                        </a>
+                        <a href="prompts.html" class="api-card">
+                            <div class="api-icon">📝</div>
+                            <h4>Prompts</h4>
+                            <p>PromptTemplate、ChatPromptTemplate</p>
+                        </a>
+                        <a href="chains.html" class="api-card">
+                            <div class="api-icon">⛓️</div>
+                            <h4>Chains</h4>
+                            <p>链式调用、LCEL 操作符</p>
+                        </a>
+                        <a href="runnables.html" class="api-card">
+                            <div class="api-icon">🔄</div>
+                            <h4>Runnables</h4>
+                            <p>Runnable 接口核心 API</p>
+                        </a>
+                        <a href="agents.html" class="api-card">
+                            <div class="api-icon">🎯</div>
+                            <h4>Agents</h4>
+                            <p>智能体、AgentExecutor</p>
+                        </a>
+                        <a href="tools.html" class="api-card">
+                            <div class="api-icon">🔧</div>
+                            <h4>Tools</h4>
+                            <p>工具定义、StructuredTool</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 数据处理 -->
+                <div class="api-category">
+                    <h3>📄 数据处理</h3>
+                    <div class="api-grid">
+                        <a href="document-loaders.html" class="api-card">
+                            <div class="api-icon">📚</div>
+                            <h4>Document Loaders</h4>
+                            <p>BaseLoader、各种文件加载器</p>
+                        </a>
+                        <a href="text-splitters.html" class="api-card">
+                            <div class="api-icon">✂️</div>
+                            <h4>Text Splitters</h4>
+                            <p>文本分割策略</p>
+                        </a>
+                        <a href="embeddings.html" class="api-card">
+                            <div class="api-icon">🔢</div>
+                            <h4>Embeddings</h4>
+                            <p>嵌入模型、向量生成</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 检索相关 -->
+                <div class="api-category">
+                    <h3>🔍 检索相关</h3>
+                    <div class="api-grid">
+                        <a href="vector-stores.html" class="api-card">
+                            <div class="api-icon">🗃️</div>
+                            <h4>Vector Stores</h4>
+                            <p>向量数据库接口</p>
+                        </a>
+                        <a href="retrievers.html" class="api-card">
+                            <div class="api-icon">🔎</div>
+                            <h4>Retrievers</h4>
+                            <p>检索器、BaseRetriever</p>
+                        </a>
+                        <a href="stores.html" class="api-card">
+                            <div class="api-icon">💾</div>
+                            <h4>Stores</h4>
+                            <p>存储后端、KV Store</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 状态管理 -->
+                <div class="api-category">
+                    <h3>🧠 状态管理</h3>
+                    <div class="api-grid">
+                        <a href="memory.html" class="api-card">
+                            <div class="api-icon">📖</div>
+                            <h4>Memory</h4>
+                            <p>记忆管理、对话历史</p>
+                        </a>
+                        <a href="checkpointers.html" class="api-card">
+                            <div class="api-icon">📍</div>
+                            <h4>Checkpointers</h4>
+                            <p>检查点、状态持久化</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 输入输出 -->
+                <div class="api-category">
+                    <h3>📤 输入输出</h3>
+                    <div class="api-grid">
+                        <a href="output-parsers.html" class="api-card">
+                            <div class="api-icon">📋</div>
+                            <h4>Output Parsers</h4>
+                            <p>输出解析器、结构化输出</p>
+                        </a>
+                        <a href="document-transformers.html" class="api-card">
+                            <div class="api-icon">🔄</div>
+                            <h4>Document Transformers</h4>
+                            <p>文档转换、处理管道</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 监控与评估 -->
+                <div class="api-category">
+                    <h3>📊 监控与评估</h3>
+                    <div class="api-grid">
+                        <a href="callbacks.html" class="api-card">
+                            <div class="api-icon">🔔</div>
+                            <h4>Callbacks</h4>
+                            <p>回调系统、事件处理</p>
+                        </a>
+                        <a href="tracers.html" class="api-card">
+                            <div class="api-icon">🛤️</div>
+                            <h4>Tracers</h4>
+                            <p>链路追踪、LangSmith</p>
+                        </a>
+                        <a href="evaluators.html" class="api-card">
+                            <div class="api-icon">✅</div>
+                            <h4>Evaluators</h4>
+                            <p>评估器、质量指标</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 高级功能 -->
+                <div class="api-category">
+                    <h3>🚀 高级功能</h3>
+                    <div class="api-grid">
+                        <a href="langgraph.html" class="api-card">
+                            <div class="api-icon">🕸️</div>
+                            <h4>LangGraph</h4>
+                            <p>图工作流、StateGraph</p>
+                        </a>
+                    </div>
+                </div>
+
+                <h2>快速查找</h2>
+
+                <div class="api-quick-find">
+                    <h3>按字母索引</h3>
+                    <div class="alpha-index">
+                        <a href="#A">A</a>
+                        <a href="#B">B</a>
+                        <a href="#C">C</a>
+                        <a href="#D">E</a>
+                        <a href="#F">F</a>
+                        <a href="#H">I-L</a>
+                        <a href="#M">M-P</a>
+                        <a href="#R">R</a>
+                        <a href="#S">S</a>
+                        <a href="#T">T-Z</a>
+                    </div>
+
+                    <h3>常用类快速链接</h3>
+                    <div class="quick-links">
+                        <div class="quick-link-group">
+                            <h4>模型相关</h4>
+                            <ul>
+                                <li><a href="language-models.html#baselanguagemodel">BaseLanguageModel</a></li>
+                                <li><a href="chat-models.html#basechatmodel">BaseChatModel</a></li>
+                                <li><a href="chat-models.html#chatopenai">ChatOpenAI</a></li>
+                                <li><a href="chat-models.html#chatanthropic">ChatAnthropic</a></li>
+                            </ul>
+                        </div>
+                        <div class="quick-link-group">
+                            <h4>提示相关</h4>
+                            <ul>
+                                <li><a href="prompts.html#prompttemplate">PromptTemplate</a></li>
+                                <li><a href="prompts.html#chatprompttemplate">ChatPromptTemplate</a></li>
+                                <li><a href="prompts.html#messagesplaceholder">MessagesPlaceholder</a></li>
+                            </ul>
+                        </div>
+                        <div class="quick-link-group">
+                            <h4>链相关</h4>
+                            <ul>
+                                <li><a href="runnables.html#runnablelambda">RunnableLambda</a></li>
+                                <li><a href="runnables.html#runnableparallel">RunnableParallel</a></li>
+                                <li><a href="runnables.html#runnablebranch">RunnableBranch</a></li>
+                                <li><a href="runnables.html#runnablepassthrough">RunnablePassthrough</a></li>
+                            </ul>
+                        </div>
+                        <div class="quick-link-group">
+                            <h4>智能体相关</h4>
+                            <ul>
+                                <li><a href="agents.html#create_agent">create_agent</a></li>
+                                <li><a href="agents.html#agentexecutor">AgentExecutor</a></li>
+                                <li><a href="tools.html#tool">tool 装饰器</a></li>
+                                <li><a href="tools.html#structuredtool">StructuredTool</a></li>
+                            </ul>
+                        </div>
+                        <div class="quick-link-group">
+                            <h4>检索相关</h4>
+                            <ul>
+                                <li><a href="document-loaders.html#baseloader">BaseLoader</a></li>
+                                <li><a href="text-splitters.html#textsplitter">TextSplitter</a></li>
+                                <li><a href="retrievers.html#baseretriever">BaseRetriever</a></li>
+                                <li><a href="vector-stores.html#vectorstore">VectorStore</a></li>
+                            </ul>
+                        </div>
+                        <div class="quick-link-group">
+                            <h4>输出相关</h4>
+                            <ul>
+                                <li><a href="output-parsers.html#baseoutputparser">BaseOutputParser</a></li>
+                                <li><a href="output-parsers.html#pydanticoutputparser">PydanticOutputParser</a></li>
+                                <li><a href="output-parsers.html#jsonoutputparser">JsonOutputParser</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h2>API 使用指南</h2>
+
+                <div class="guide-section">
+                    <h3>安装 LangChain</h3>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">bash</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-bash"># 核心包
+pip install langchain-core
+
+# 完整包
+pip install langchain
+
+# 文本分割
+pip install langchain-text-splitters
+
+# 社区集成
+pip install langchain-community</code></pre>
+                    </div>
+                </div>
+
+                <div class="guide-section">
+                    <h3>核心导入模式</h3>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python"># 语言模型
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# 提示模板
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import MessagesPlaceholder
+
+# 链和运行
+from langchain_core.runnables import (
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
+    RunnableBranch
+)
+
+# 输出解析
+from langchain_core.output_parsers import (
+    PydanticOutputParser,
+    JsonOutputParser,
+    StrOutputParser
+)
+
+# 工具
+from langchain_core.tools import tool
+from langchain_core.tools import StructuredTool
+
+# 智能体
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+
+# 文档加载
+from langchain_community.document_loaders import (
+    TextLoader,
+    PyPDFLoader,
+    WebBaseLoader
+)
+
+# 文本分割
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    CharacterTextSplitter
+)
+
+# 向量存储
+from langchain.vectorstores import Chroma, FAISS
+from langchain_community.vectorstores import PineconeVectorStore
+
+# 嵌入
+from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# 检索
+from langchain_core.retrievers import BaseRetriever
+
+# 记忆
+from langchain.memory import ConversationBufferMemory
+from langchain_core.chat_history import (
+    BaseChatMessageHistory,
+    InMemoryChatMessageHistory
+)
+
+# 回调
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain.callbacks import StdOutCallbackHandler
+
+# 评估
+from langchain_core.evaluators import StringEvaluator
+from langchain_core.evaluators import load_evaluator
+
+# LangGraph
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver</code></pre>
+                    </div>
+                </div>
+
+                <h2>API 版本说明</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>包</th>
+                        <th>版本</th>
+                        <th>说明</th>
+                    </tr>
+                    <tr>
+                        <td>langchain</td>
+                        <td>^0.3.0</td>
+                        <td>主包，包含 chains、agents 等</td>
+                    </tr>
+                    <tr>
+                        <td>langchain-core</td>
+                        <td>^0.3.0</td>
+                        <td>核心接口，无第三方依赖</td>
+                    </tr>
+                    <tr>
+                        <td>langchain-text-splitters</td>
+                        <td>^0.3.0</td>
+                        <td>文本分割器</td>
+                    </tr>
+                    <tr>
+                        <td>langchain-community</td>
+                        <td>^0.3.0</td>
+                        <td>社区集成</td>
+                    </tr>
+                    <tr>
+                        <td>langchain-openai</td>
+                        <td>^0.2.0</td>
+                        <td>OpenAI 集成</td>
+                    </tr>
+                    <tr>
+                        <td>langgraph</td>
+                        <td>^0.2.0</td>
+                        <td>图工作流</td>
+                    </tr>
+                </table>
+
+                <div class="note" data-label="提示">
+                    查看 <a href="../04-chains.html">链式调用</a>、<a href="../05-tools.html">工具系统</a>、<a href="../06-agents.html">智能体</a> 等教程章节获取更多使用示例和最佳实践。
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="../18-best-practices.html">← 返回教程：最佳实践</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>追踪器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-tracers">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+            <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>追踪器 API</h1>
+                <p class="subtitle">LangSmith 链路追踪与调试</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#setup" class="api-nav-link">配置</a>
+                    <a href="#runnables" class="api-nav-link">Runnable 追踪</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>LangSmith 追踪系统让你完整记录 LangChain 应用的执行过程，支持调试、性能分析和质量评估。</p>
+
+                <pre class="mermaid">graph LR
+    A[LangChain 应用] --> B[设置环境变量]
+    B --> C[自动追踪]
+    C --> D[LangSmith 平台]
+
+    D --> E[查看执行链路]
+    D --> F[性能分析]
+    D --> G[对比版本]
+
+    E --> H[调试]
+    F --> I[优化]
+    G --> J[A/B 测试]
+
+    style B fill:#e1f5fe
+    style D fill:#c8e6c9</code></pre>
+
+                <h2 id="setup">配置</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">环境变量配置</h3>
+                    <p class="api-description">设置环境变量启用自动追踪。</p>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">bash</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-bash"># 设置环境变量
+export LANGCHAIN_TRACING_V2=true
+export LANGCHAIN_API_KEY="lsv2_your-api-key-here"
+export LANGCHAIN_PROJECT="my-awesome-project"
+
+# 或在代码中设置
+import os
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "lsv2_your-key"
+os.environ["LANGCHAIN_PROJECT"] = "my-project"</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">可选环境变量</h3>
+
+                    <table class="api-table">
+                        <tr>
+                            <th>变量</th>
+                            <th>说明</th>
+                            <th>默认值</th>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_TRACING_V2</td>
+                            <td>是否启用追踪</td>
+                            <td>false</td>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_API_KEY</td>
+                            <td>LangSmith API 密钥</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_ENDPOINT</td>
+                            <td>API 端点 URL</td>
+                            <td>https://api.smith.langchain.com</td>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_PROJECT</td>
+                            <td>项目名称</td>
+                            <td>default</td>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_SESSION</td>
+                            <td>会话名称</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>LANGCHAIN_HIDE_INPUTS</td>
+                            <td>是否隐藏输入（隐私保护）</td>
+                            <td>false</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <h2 id="runnables">Runnable 追踪</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">配置参数</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.runnables import RunnableConfig
+
+# 追踪配置
+config = RunnableConfig(
+    callbacks=[callback_handler],  # 回调处理器
+    tags=["production", "api"],      # 标签
+    metadata={                        # 元数据
+        "user_id": "user_123",
+        "version": "1.0"
+    },
+    run_name="my_chain_run"            # 运行名称
+)
+
+result = chain.invoke(input_data, config=config)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">使用回调追踪</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+
+class TracingCallback(BaseCallbackHandler):
+    """自定义追踪回调"""
+
+    def __init__(self, project_name: str):
+        self.project_name = project_name
+
+    def on_chain_start(self, serialized, inputs, **kwargs):
+        print(f"[{self.project_name}] Chain 开始: {inputs}")
+
+    def on_chain_end(self, outputs, **kwargs):
+        print(f"[{self.project_name}] Chain 结束: {outputs}")
+
+    def on_llm_start(self, serialized, prompts, **kwargs):
+        print(f"[{self.project_name}] LLM 开始")
+
+    def on_llm_end(self, response, **kwargs):
+        print(f"[{self.project_name}] LLM 结束")
+
+# 使用
+handler = TracingCallback("my_project")
+result = chain.invoke(input, config={"callbacks": [handler]})</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">LangSmith 集成</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langsmith import Client
+
+# 初始化客户端
+client = Client(
+    api_key="lsv2_your-key",
+    api_url="https://api.smith.langchain.com"  # 可选
+)
+
+# 创建运行
+run = client.create_run(
+    project_name="my-project",
+    name="test_run",
+    inputs={"query": "test"}
+)
+
+# 记录事件
+run.create_event(
+    event_type="llm",
+    inputs={"prompt": "hello"},
+    outputs={"response": "hi there"}
+)
+
+# 结束运行
+run.end(outputs={"result": "success"})
+
+# ========== 查询运行 ==========
+# 列出运行
+runs = client.list_runs(
+    project_name="my-project",
+    execution_order="DESC",  # 排序
+    limit=10
+)
+
+# 获取特定运行
+run = client.read_run(run_id="run_id_here")
+
+# ========== 对比运行 ==========
+from langsmith import evaluators
+
+result = evaluators.create_comparison(
+    runs=[run_id_1, run_id_2]
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 基础自动追踪 ==========
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+# 启用追踪
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "lsv2_your-key"
+os.environ["LANGCHAIN_PROJECT"] = "demo"
+
+# 正常使用 - 自动追踪
+prompt = ChatPromptTemplate.from_template("讲一个关于{topic}的故事")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+result = chain.invoke({"topic": "Python"})
+# 自动记录到 LangSmith
+
+# ========== 示例2: 添加自定义追踪 ==========
+from langchain_core.callbacks import BaseCallbackHandler
+
+class CustomTracer(BaseCallbackHandler):
+    def on_llm_start(self, serialized, prompts, **kwargs):
+        print(f"LLM 输入: {prompts[0][:50]}...")
+
+    def on_llm_end(self, response, **kwargs):
+        if hasattr(response, "llm_output"):
+            usage = response.llm_output.get("token_usage", {})
+            print(f"Token 使用: {usage}")
+
+result = chain.invoke(
+    {"topic": "Python"},
+    config={"callbacks": [CustomTracer()]}
+)
+
+# ========== 示例3: 多标签和元数据 ==========
+result = chain.invoke(
+    {"topic": "Python"},
+    config={
+        "tags": ["production", "v1.0"],
+        "metadata": {
+            "user_id": "user_123",
+            "environment": "production",
+            "model": "gpt-4o"
+        },
+        "run_name": "story_generation"
+    }
+)
+
+# ========== 示例4: 查询运行历史 ==========
+from langsmith import Client
+
+client = Client(api_key="lsv2_your-key")
+
+# 列出最近运行
+runs = client.list_runs(
+    project_name="demo",
+    limit=10
+)
+
+for run in runs:
+    print(f"Run: {run.name}, ID: {run.id}")
+
+# ========== 示例5: 对比两个运行 ==========
+run_id_1 = "first_run_id"
+run_id_2 = "second_run_id"
+
+comparison = client.compare_runs(
+    run_a=run_id_1,
+    run_b=run_id_2
+)
+
+# ========== 示例6: 获取性能数据 ==========
+run = client.read_run(run_id="some_id")
+
+# 计算耗时
+start_time = run.start_time
+end_time = run.end_time
+duration = (end_time - start_time).total_seconds()
+
+# Token 统计
+if run.outputs:
+    llm_results = run.outputs.get("llm_output", {})
+    tokens = llm_results.get("token_usage", {})
+    print(f"耗时: {duration}s, Tokens: {tokens}")
+
+# ========== 示例7: 本地追踪（不使用 LangSmith）==========
+from langchain.callbacks import StdOutCallbackHandler
+
+handler = StdOutCallbackHandler()
+result = chain.invoke(
+    {"topic": "Python"},
+    config={"callbacks": [handler]}
+)
+# 打印到控制台</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="callbacks.html">Callbacks API</a></li>
+                    <li><a href="evaluators.html">Evaluators API</a></li>
+                    <li><a href="../15-tracing.html">教程：链路追踪</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="callbacks.html">← Callbacks API</a>
+                    <a href="evaluators.html" class="next">Evaluators API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

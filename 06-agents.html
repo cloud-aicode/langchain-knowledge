@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能体 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-agents">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>智能体 (Agents)</h1>
+                <p class="subtitle">自主决策的 AI 智能体系统</p>
+
+                <h2>什么是智能体？</h2>
+                <p>智能体是 LLM 应用，能够：</p>
+                <ul>
+                    <li><strong>推理</strong>：分析用户意图并规划行动步骤</li>
+                    <li><strong>决策</strong>：选择合适的工具来完成任务</li>
+                    <li><strong>执行</strong>：调用工具并处理结果</li>
+                    <li><strong>迭代</strong>：根据结果调整策略，持续直到完成目标</li>
+                </ul>
+
+                <h2>LangChain 1.0 智能体 API</h2>
+
+                <h3>创建智能体</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain import ChatOpenAI
+from langchain.agents import create_tool_calling_agent
+from langchain_core.tools import tool
+
+# 1. 定义工具
+@tool
+def search(query: str) -> str:
+    """搜索网络信息"""
+    return f"关于 '{query}' 的搜索结果..."
+
+@tool
+def calculate(expression: str) -> str:
+    """计算数学表达式"""
+    try:
+        return f"结果: {eval(expression)}"
+    except Exception as e:
+        return f"计算错误: {e}"
+
+# 2. 创建模型
+llm = ChatOpenAI(model="gpt-4o")
+
+# 3. 创建工具调用智能体
+tools = [search, calculate]
+agent = create_tool_calling_agent(
+    llm,
+    tools,
+    system_prompt="你是一个有帮助的助手，可以使用工具回答问题。"
+)
+
+# 4. 运行智能体
+response = agent.invoke({
+    "messages": [
+        {"role": "user", "content": "搜索 Python 的最新版本并计算 3.11 * 2"}
+    ]
+})
+
+print(response["messages"][-1].content)</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    <code>create_tool_calling_agent</code> 是 LangChain 1.0 推荐的方式，它自动为支持工具调用的模型（如 GPT-4、Claude 3）启用原生工具调用功能。
+                </div>
+
+                <h2>智能体类型</h2>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>类型</th>
+                        <th>特点</th>
+                        <th>适用场景</th>
+                    </tr>
+                    <tr>
+                        <td><code>create_tool_calling_agent</code></td>
+                        <td>原生工具调用</td>
+                        <td>GPT-4、Claude 3 等现代模型</td>
+                    </tr>
+                    <tr>
+                        <td><code>create_react_agent</code></td>
+                        <td>ReAct 框架</td>
+                        <td>需要推理步骤的场景</td>
+                    </tr>
+                    <tr>
+                        <td><code>create_self_critique_agent</code></td>
+                        <td>自我批评</td>
+                        <td>需要优化输出的场景</td>
+                    </tr>
+                    <tr>
+                        <td>自定义 Agent</td>
+                        <td>完全自定义</td>
+                        <td>特殊需求场景</td>
+                    </tr>
+                </table>
+
+                <h2>ReAct Agent</h2>
+                <p>ReAct (Reasoning + Acting) 是经典的智能体框架：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.agents import create_react_agent
+from langchain import hub
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+
+# 获取 ReAct 提示模板
+prompt = hub.pull("hwchase17/react")
+
+# 定义工具
+@tool
+def get_word_length(word: str) -> int:
+    """获取单词长度"""
+    return len(word)
+
+@tool
+def double_number(n: int) -> int:
+    """将数字翻倍"""
+    return n * 2
+
+# 创建 ReAct 智能体
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+tools = [get_word_length, double_number]
+
+agent = create_react_agent(
+    llm,
+    tools,
+    prompt=prompt
+)
+
+# 运行
+from langchain.agents import AgentExecutor
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True  # 打印思考过程
+)
+
+result = agent_executor.invoke({
+    "input": "单词 'hello' 的长度是多少？然后把结果翻倍"
+})</code></pre>
+                </div>
+
+                <h2>Agent 执行流程</h2>
+
+                <pre class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant A as Agent
+    participant LLM as LLM
+    participant T as 工具
+
+    U->>A: 发送任务
+    A->>LLM: 请求 + 工具定义
+    LLM->>A: 需要调用工具
+    A->>T: 调用工具
+    T->>A: 返回结果
+    A->>LLM: 结果 + 继续请求
+    LLM->>A: 需要更多工具
+    A->>T: 调用工具
+    T->>A: 返回结果
+    A->>LLM: 所有结果
+    LLM->>A: 生成最终答案
+    A->>U: 返回响应</code></pre>
+
+                <h2>结构化工具输出</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool
+from typing import Literal
+from pydantic import BaseModel, Field
+
+# 定义输出结构
+class WeatherResponse(BaseModel):
+    """天气响应"""
+    location: str = Field(..., description="位置")
+    temperature: float = Field(..., description="温度")
+    condition: str = Field(..., description="天气状况")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "location": "北京",
+                "temperature": 25.5,
+                "condition": "晴天"
+            }
+        }
+
+# 创建结构化输出工具
+@tool
+def get_weather(location: str) -> WeatherResponse:
+    """获取指定位置的天气信息"""
+    # 模拟 API 调用
+    import random
+    return WeatherResponse(
+        location=location,
+        temperature=random.uniform(15, 35),
+        condition=random.choice(["晴天", "多云", "雨天"])
+    )
+
+# 使用
+result = get_weather.invoke("上海")
+print(result)
+# WeatherResponse(location='上海', temperature=23.4, condition='多云')</code></pre>
+                </div>
+
+                <h2>多工具协作</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain import ChatOpenAI
+from langchain.agents import create_tool_calling_agent
+from langchain_core.tools import tool
+import requests
+import wikipedia
+
+# 工具 1: 获取当前时间
+@tool
+def get_current_time() -> str:
+    """获取当前时间"""
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# 工具 2: 搜索 Wikipedia
+@tool
+def search_wikipedia(query: str) -> str:
+    """在 Wikipedia 上搜索"""
+    try:
+        summary = wikipedia.summary(query, sentences=2)
+        return summary
+    except:
+        return f"未找到关于 '{query}' 的 Wikipedia 条目"
+
+# 工具 3: 获取天气
+@tool
+def get_weather(location: str) -> str:
+    """获取指定位置的天气"""
+    return f"{location}今天天气晴朗，温度约 25°C"
+
+# 创建智能体
+llm = ChatOpenAI(model="gpt-4o")
+tools = [get_current_time, search_wikipedia, get_weather]
+
+agent = create_tool_calling_agent(
+    llm,
+    tools,
+    system_prompt="你是一个多功能助手，可以使用工具回答各种问题。"
+)
+
+# 测试多工具协作
+response = agent.invoke({
+    "messages": [
+        {"role": "user", "content": "现在几点了？帮我搜索 Python 编程语言的维基百科，顺便查一下北京的天气"}
+    ]
+})
+
+print(response["messages"][-1].content)</code></pre>
+                </div>
+
+                <h2>自定义 Agent</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.agents import AgentExecutor, BaseSingleActionAgent
+from langchain_core.prompts import PromptTemplate
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+
+# 定义工具
+@tool
+def multiply(a: int, b: int) -> int:
+    """乘法运算"""
+    return a * b
+
+# 自定义 Agent 类
+class CalculatorAgent(BaseSingleActionAgent):
+    """计算器智能体"""
+
+    @property
+    def input_keys(self):
+        return ["input"]
+
+    def plan(
+        self,
+        inputs,
+        intermediate_steps,
+        **kwargs
+    ):
+        """规划下一步行动"""
+        # 分析输入决定是否需要计算
+        if "乘以" in inputs["input"] or "x" in inputs["input"].lower():
+            # 提取数字
+            import re
+            numbers = re.findall(r'\d+', inputs["input"])
+            if len(numbers) >= 2:
+                return {
+                    "action": multiply,
+                    "action_input": {"a": int(numbers[0]), "b": int(numbers[1])}
+                }
+        return {"action": None, "action_input": inputs["input"]}
+
+    async def aplan(
+        self,
+        inputs,
+        intermediate_steps,
+        **kwargs
+    ):
+        """异步规划"""
+        return self.plan(inputs, intermediate_steps, **kwargs)
+
+# 创建 Agent 实例
+agent = CalculatorAgent()
+
+# 创建执行器
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=[multiply],
+    verbose=True
+)
+
+# 运行
+result = agent_executor.invoke({"input": "5 乘以 3 等于多少？"})
+print(result["output"])</code></pre>
+                </div>
+
+                <h2>Agent 调试</h2>
+
+                <div class="tip" data-label="调试技巧">
+                    设置 <code>verbose=True</code> 可以查看智能体的完整思考过程，包括推理、工具选择和执行步骤。
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.agents import AgentExecutor
+
+# 启用详细输出
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,  # 打印每一步
+    return_intermediate_steps=True,  # 返回中间步骤
+    max_iterations=5,  # 最大迭代次数
+    handle_parsing_errors=True,  # 自动处理解析错误
+    early_stopping_method="generate"  # 早期停止策略
+)
+
+# 执行并获取详细步骤
+result = agent_executor.invoke({"input": "复杂问题"})
+
+# 查看中间步骤
+for step in result["intermediate_steps"]:
+    print(f"工具调用: {step[0].tool}")
+    print(f"工具输入: {step[0].tool_input}")
+    print(f"工具输出: {step[1]}")
+    print("---")</code></pre>
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="04-chains.html" class="prev">← 链式调用</a>
+                    <a href="06-tools.html" class="next">工具系统 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. LangChain 1.0 推荐的创建智能体的方法是？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. initialize_agent</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. create_tool_calling_agent</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. AgentExecutor</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. create_react_agent</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            2. 创建一个智能体，包含三个工具：获取时间、计算加法、搜索维基百科
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain import ChatOpenAI
+from langchain.agents import create_tool_calling_agent
+from langchain_core.tools import tool
+from datetime import datetime
+
+@tool
+def get_current_time() -> str:
+    """获取当前日期时间"""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+@tool
+def add_numbers(a: int, b: int) -> int:
+    """计算两个数的和"""
+    return a + b
+
+@tool
+def search_wikipedia(query: str) -> str:
+    """在 Wikipedia 上搜索信息"""
+    try:
+        import wikipedia
+        return wikipedia.summary(query, sentences=2)
+    except:
+        return f"未找到 '{query}' 的相关信息"
+
+llm = ChatOpenAI(model="gpt-4o")
+tools = [get_current_time, add_numbers, search_wikipedia]
+
+agent = create_tool_calling_agent(
+    llm,
+    tools,
+    system_prompt="你是一个多功能助手。"
+)
+
+response = agent.invoke({
+    "messages": [
+        {"role": "user", "content": "现在几点？计算 25 + 17，搜索人工智能"}
+    ]
+})
+
+print(response["messages"][-1].content)</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

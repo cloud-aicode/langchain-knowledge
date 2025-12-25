@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型模块 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-models">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>模型模块 (Models)</h1>
+                <p class="subtitle">统一接口调用多种大语言模型</p>
+
+                <h2>模型类型</h2>
+                <p>LangChain 提供两种主要的模型接口：</p>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>类型</th>
+                        <th>用途</th>
+                        <th>输入</th>
+                        <th>输出</th>
+                    </tr>
+                    <tr>
+                        <td><code>LLM</code></td>
+                        <td>文本补全</td>
+                        <td>字符串</td>
+                        <td>字符串</td>
+                    </tr>
+                    <tr>
+                        <td><code>ChatModel</code></td>
+                        <td>对话交互</td>
+                        <td>消息列表</td>
+                        <td>消息</td>
+                    </tr>
+                </table>
+
+                <h2>基础用法</h2>
+
+                <h3>1. OpenAI 模型</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAI
+
+# ChatModel - 推荐
+chat = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.7,
+    max_tokens=1000
+)
+
+# LLM - 传统文本补全
+llm = OpenAI(
+    model="gpt-3.5-turbo-instruct",
+    temperature=0.5
+)
+
+# 调用 ChatModel
+response = chat.invoke([
+    {"role": "user", "content": "你好，请介绍一下你自己"}
+])
+print(response.content)
+
+# 调用 LLM
+completion = llm.invoke("Once upon a time")
+print(completion)</code></pre>
+                </div>
+
+                <h3>2. Anthropic Claude</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_anthropic import ChatAnthropic
+
+chat = ChatAnthropic(
+    model="claude-sonnet-4-5-20250514",
+    temperature=0.7,
+    max_tokens=2000,
+    anthropic_api_key="your-api-key"
+)
+
+response = chat.invoke([
+    {"role": "user", "content": "解释什么是机器学习"}
+])
+print(response.content)</code></pre>
+                </div>
+
+                <h3>3. Google Gemini</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_google_genai import ChatGoogleGenerativeAI
+
+chat = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash-exp",
+    temperature=0.7,
+    google_api_key="your-api-key"
+)
+
+response = chat.invoke([
+    {"role": "user", "content": "用 Python 写一个快速排序"}
+])
+print(response.content)</code></pre>
+                </div>
+
+                <h2>流式输出</h2>
+                <p>流式输出可以逐块获取响应，提升用户体验：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+chat = ChatOpenAI(model="gpt-4o")
+
+# 方法一：使用 stream()
+print("流式输出:")
+for chunk in chat.stream("讲一个简短的故事"):
+    print(chunk.content, end="", flush=True)
+
+# 方法二：使用 astream() - 异步
+import asyncio
+
+async def async_stream():
+    print("\n异步流式输出:")
+    async for chunk in chat.astream("用一句话描述 Python"):
+        print(chunk.content, end="", flush=True)
+
+asyncio.run(async_stream())</code></pre>
+                </div>
+
+                <h2>结构化输出</h2>
+                <p>使用 <code>with_structured_output</code> 获取格式化的 JSON 输出：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+# 定义输出结构
+class WeatherInfo(BaseModel):
+    """天气信息"""
+    location: str = Field(..., description="位置")
+    temperature: float = Field(..., description="温度（摄氏度）")
+    condition: str = Field(..., description="天气状况")
+    humidity: int = Field(..., description="湿度百分比")
+
+# 创建结构化输出模型
+chat = ChatOpenAI(model="gpt-4o")
+structured_chat = chat.with_structured_output(WeatherInfo)
+
+# 调用
+result = structured_chat.invoke("北京今天的天气：温度25度，晴天，湿度60%")
+print(f"位置: {result.location}")
+print(f"温度: {result.temperature}°C")
+print(f"天气: {result.condition}")
+print(f"湿度: {result.humidity}%")</code></pre>
+                </div>
+
+                <h2>多模态输入</h2>
+                <p>支持文本、图片等多种输入类型：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage
+
+chat = ChatOpenAI(model="gpt-4o")
+
+# 图片分析
+message = HumanMessage(
+    content=[
+        {"type": "text", "text": "这张图片里有什么？"},
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://example.com/image.jpg"
+            }
+        }
+    ]
+)
+
+response = chat.invoke([message])
+print(response.content)</code></pre>
+                </div>
+
+                <h2>模型参数详解</h2>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>参数</th>
+                        <th>类型</th>
+                        <th>默认值</th>
+                        <th>说明</th>
+                    </tr>
+                    <tr>
+                        <td><code>model</code></td>
+                        <td>str</td>
+                        <td>-</td>
+                        <td>模型名称（必需）</td>
+                    </tr>
+                    <tr>
+                        <td><code>temperature</code></td>
+                        <td>float</td>
+                        <td>0.7</td>
+                        <td>随机性（0-2），越高越随机</td>
+                    </tr>
+                    <tr>
+                        <td><code>max_tokens</code></td>
+                        <td>int</td>
+                        <td>-</td>
+                        <td>最大输出 tokens</td>
+                    </tr>
+                    <tr>
+                        <td><code>top_p</code></td>
+                        <td>float</td>
+                        <td>1.0</td>
+                        <td>核采样（0-1）</td>
+                    </tr>
+                    <tr>
+                        <td><code>frequency_penalty</code></td>
+                        <td>float</td>
+                        <td>0</td>
+                        <td>频率惩罚（-2到2）</td>
+                    </tr>
+                    <tr>
+                        <td><code>presence_penalty</code></td>
+                        <td>float</td>
+                        <td>0</td>
+                        <td>存在惩罚（-2到2）</td>
+                    </tr>
+                    <tr>
+                        <td><code>stop</code></td>
+                        <td>list</td>
+                        <td>null</td>
+                        <td>停止序列</td>
+                    </tr>
+                </table>
+
+                <h2>生产级配置</h2>
+
+                <h3>重试机制</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.rate_limiters import InMemoryRateLimiter
+
+chat = ChatOpenAI(
+    model="gpt-4o",
+    # 速率限制
+    rate_limiter=InMemoryRateLimiter(
+        requests_per_second=10,
+        check_interval=0.1
+    ),
+    # 超时设置
+    request_timeout=30,
+    # 最大重试次数
+    max_retries=3
+)</code></pre>
+                </div>
+
+                <h3>成本追踪</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain.callbacks import get_openai_callback
+
+chat = ChatOpenAI(model="gpt-4o")
+
+# 追踪成本
+with get_openai_callback() as cb:
+    response = chat.invoke("写一首关于编程的诗")
+    print(response.content)
+
+    # 打印成本信息
+    print(f"\n总成本: ${cb.total_cost:.4f}")
+    print(f"输入 tokens: {cb.prompt_tokens}")
+    print(f"输出 tokens: {cb.completion_tokens}")
+    print(f"总 tokens: {cb.total_tokens}")</code></pre>
+                </div>
+
+                <h2>模型选择指南</h2>
+
+                <pre class="mermaid">graph TD
+    A[模型选择] --> B{任务类型}
+
+    B -->|对话| C[ChatModel]
+    B -->|文本补全| D[LLM]
+
+    C --> E{场景}
+    C -->|简单任务| F[GPT-4o-mini]
+    C -->|复杂推理| G[GPT-4o / Claude 3.5 Sonnet]
+    C -->|超长上下文| H[Claude 3 Opus]
+
+    D --> I{场景}
+    D -->|代码补全| J[GPT-4]
+    D -->|文本生成| K[GPT-3.5-turbo-instruct]</code></pre>
+
+                <div class="tip" data-label="提示">
+                    <strong>模型选择建议</strong>：<br>
+                    • 快速原型/简单任务：GPT-4o-mini（成本最低）<br>
+                    • 日常对话/中等复杂度：GPT-4o、Claude 3.5 Sonnet<br>
+                    • 复杂推理/代码生成：GPT-4o、Claude 3 Opus<br>
+                    • 超长上下文：Claude 3（200K tokens）
+                </div>
+
+                <h2>常见问题</h2>
+
+                <h4>Q: ChatModel 和 LLM 如何选择？</h4>
+                <p>A：绝大多数情况使用 ChatModel。LLM 主要用于特定的文本补全场景（如代码补全）。</p>
+
+                <h4>Q: 如何设置 API Key？</h4>
+                <p>A：推荐使用环境变量，也可以在初始化时通过参数传入：</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># 方式一：环境变量（推荐）
+import os
+os.environ["OPENAI_API_KEY"] = "your-key"
+
+# 方式二：直接传入
+chat = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your-key"
+)</code></pre>
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="01-quickstart.html" class="prev">← 快速入门</a>
+                    <a href="03-prompts.html" class="next">提示工程 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 以下哪个是流式输出的正确方法？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. chat.stream_fast()</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. chat.stream()</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. chat.stream_all()</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. chat.output_stream()</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. temperature 参数的作用是？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 控制输出速度</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 控制随机性</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 控制输出长度</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 控制模型选择</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            3. 创建一个 ChatModel，实现流式输出，并追踪 token 成本
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain.callbacks import get_openai_callback
+
+chat = ChatOpenAI(model="gpt-4o", temperature=0.7)
+
+with get_openai_callback() as cb:
+    print("AI 回答:")
+    for chunk in chat.stream("用三句话介绍 Python"):
+        print(chunk.content, end="", flush=True)
+
+    print(f"\n\n成本统计:")
+    print(f"总 tokens: {cb.total_tokens}")
+    print(f"总成本: ${cb.total_cost:.4f}")</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

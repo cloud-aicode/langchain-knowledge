@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本分割 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-text-splitters">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>文本分割</h1>
+                <p class="subtitle">将长文档切分成适合检索的小块</p>
+
+                <h2>为什么需要文本分割？</h2>
+                <p>在 RAG 应用中，我们不能直接把整个文档塞给 LLM。原因很简单：</p>
+                <ul>
+                    <li><strong>上下文限制</strong>：LLM 有输入 token 限制（如 GPT-4 是 128K tokens）</li>
+                    <li><strong>检索精度</strong>：小块内容更容易精准匹配用户查询</li>
+                    <li><strong>成本控制</strong>：处理小块内容比处理大文档更便宜</li>
+                    <li><strong>性能优化</strong>：小块内容的向量检索更快</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    文本分割就像把一本书拆成章节和段落——让读者（LLM）能快速找到相关内容，而不是每次都要翻完整本书。
+                </div>
+
+                <h2>分割策略对比</h2>
+
+                <pre class="mermaid">graph TD
+    A[文档分割] --> B{分割方式?}
+    B -->|固定长度| C[CharacterTextSplitter]
+    B -->|递归分割| D[RecursiveCharacterTextSplitter]
+    B -->|语义分割| E[SemanticTextSplitter]
+    B -->|代码分割| F[CodeTextSplitter]
+
+    C --> C1[按字符数切分]
+    D --> D1[优先段落/句子]
+    E --> E1[按语义边界]
+    F --> F1[按代码结构]
+
+    style D fill:#c8e6c9
+    style E fill:#fff9c4</code></pre>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>分割器类型</th>
+                        <th>原理</th>
+                        <th>优点</th>
+                        <th>缺点</th>
+                        <th>适用场景</th>
+                    </tr>
+                    <tr>
+                        <td><code>CharacterTextSplitter</code></td>
+                        <td>按固定字符数</td>
+                        <td>简单可控</td>
+                        <td>可能截断句子</td>
+                        <td>简单文本</td>
+                    </tr>
+                    <tr>
+                        <td><code>RecursiveCharacterTextSplitter</code></td>
+                        <td>递归查找分隔符</td>
+                        <td>保持语义完整</td>
+                        <td>速度稍慢</td>
+                        <td>大多数文档（推荐）</td>
+                    </tr>
+                    <tr>
+                        <td><code>SemanticTextSplitter</code></td>
+                        <td>按语义相似度</td>
+                        <td>语义最佳</td>
+                        <td>需要额外模型</td>
+                        <td>重要文档</td>
+                    </tr>
+                    <tr>
+                        <td><code>CodeTextSplitter</code></td>
+                        <td>按代码结构</td>
+                        <td>保留代码逻辑</td>
+                        <td>仅限代码</td>
+                        <td>代码文档</td>
+                    </tr>
+                </table>
+
+                <h2>RecursiveCharacterTextSplitter（推荐）</h2>
+                <p>这是最常用的分割器，它会递归地尝试不同的分隔符，优先保持语义完整：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 创建分割器
+text_splitter = RecursiveCharacterTextSplitter(
+    # 每个文本块的最大字符数
+    chunk_size=1000,
+
+    # 文本块之间的重叠字符数（重要！避免丢失上下文）
+    chunk_overlap=200,
+
+    # 分隔符列表，按优先级顺序尝试
+    separators=["\n\n", "\n", "。", "！", "？", ".", " ", ""],
+
+    # 分割后的文本块长度检查函数
+    length_function=len,
+
+    # 是否包含分隔符在分割结果中
+    keep_separator=True
+)
+
+# 示例文本
+text = """
+LangChain 是一个强大的 LLM 应用开发框架。
+它提供了丰富的工具和组件，帮助开发者快速构建应用。
+
+第一部分：模型集成
+LangChain 支持多种模型，包括 OpenAI、Anthropic、Google 等。
+开发者可以轻松切换不同的模型提供商。
+
+第二部分：链式调用
+通过 LCEL（LangChain Expression Language），
+开发者可以用声明式的方式构建复杂的调用链。
+"""
+
+# 执行分割
+chunks = text_splitter.split_text(text)
+
+# 查看结果
+for i, chunk in enumerate(chunks, 1):
+    print(f"--- 块 {i} ({len(chunk)} 字符) ---")
+    print(chunk)
+    print()</code></pre>
+                </div>
+
+                <div class="note" data-label="关于重叠">
+                    <code>chunk_overlap</code> 是关键参数！设置 10-20% 的重叠可以确保重要信息不会被截断。例如，1000 字符的块可以设置 200 字符的重叠。
+                </div>
+
+                <h2>直接分割 Document 对象</h2>
+                <p>实际应用中，我们通常直接处理从 Loader 加载的 Document 对象：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 1. 加载文档
+loader = PyPDFLoader("large-document.pdf")
+documents = loader.load()
+
+print(f"加载了 {len(documents)} 页")
+
+# 2. 创建分割器
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    separators=["\n\n", "\n", "。", " ", ""]
+)
+
+# 3. 分割文档
+splits = text_splitter.split_documents(documents)
+
+print(f"分割成 {len(splits)} 个文本块")
+
+# 4. 查看分割结果
+for i, split in enumerate(splits[:3], 1):
+    print(f"\n--- 块 {i} ---")
+    print(f"来源: {split.metadata['source']}")
+    print(f"页码: {split.metadata['page']}")
+    print(f"内容长度: {len(split.page_content)}")
+    print(f"内容: {split.page_content[:100]}...")</code></pre>
+                </div>
+
+                <h2>CharacterTextSplitter</h2>
+                <p>最简单的分割器，按固定字符数切分：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_text_splitters import CharacterTextSplitter
+
+# 简单分割器
+text_splitter = CharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=0,  # 通常不设置重叠
+    separator="\n\n",  # 只使用一个分隔符
+    length_function=len
+)
+
+# 分割文本
+text = "这是一段很长的文本..." * 100
+chunks = text_splitter.split_text(text)
+
+print(f"分割成 {len(chunks)} 个块")</code></pre>
+                </div>
+
+                <div class="warning" data-label="警告">
+                    <code>CharacterTextSplitter</code> 可能会在句子中间截断，影响语义理解。建议优先使用 <code>RecursiveCharacterTextSplitter</code>。
+                </div>
+
+                <h2>SemanticTextSplitter（语义分割）</h2>
+                <p>基于语义相似度分割，确保每个块内部语义连贯：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_experimental.text_splitter import SemanticTextSplitter
+from langchain_openai import OpenAIEmbeddings
+
+# 需要嵌入模型来计算语义相似度
+embeddings = OpenAIEmbeddings()
+
+text_splitter = SemanticTextSplitter(
+    embeddings=embeddings,
+    # 每个块的最大字符数
+    chunk_size=1000,
+    # 相邻块之间的相似度阈值
+    breakpoint_threshold_type="percentile",  # 或 "standard_deviation"
+    breakpoint_threshold_amount=0.6
+)
+
+# 分割文档
+documents = loader.load()
+splits = text_splitter.split_documents(documents)
+
+# 语义分割会在语义变化处切分，而不是固定位置
+for i, split in enumerate(splits, 1):
+    print(f"块 {i}: {len(split.page_content)} 字符")</code></pre>
+                </div>
+
+                <div class="tip" data-label="使用建议">
+                    语义分割质量最高，但需要额外的 API 调用（嵌入模型），成本较高。建议用于：
+                    <ul>
+                        <li>重要文档的精细分割</li>
+                        <li>对检索质量要求极高的场景</li>
+                        <li>文档内容复杂、层次分明的场景</li>
+                    </ul>
+                </div>
+
+                <h2>代码分割</h2>
+                <p>针对代码文件的特殊分割器，保持代码结构完整：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_text_splitters import (
+    PythonCodeTextSplitter,
+    JavaScriptTextSplitter,
+    RecursiveCharacterTextSplitter
+)
+
+# Python 代码分割器
+python_splitter = PythonCodeTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=100
+)
+
+# 示例 Python 代码
+python_code = '''
+def calculate_fibonacci(n):
+    """计算斐波那契数列"""
+    if n <= 1:
+        return n
+    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)
+
+class FibonacciCalculator:
+    def __init__(self):
+        self.cache = {}
+
+    def get(self, n):
+        if n not in self.cache:
+            self.cache[n] = calculate_fibonacci(n)
+        return self.cache[n]
+'''
+
+# 分割代码
+code_docs = python_splitter.create_documents([python_code])
+
+for doc in code_docs:
+    print(f"--- 代码块 ---")
+    print(doc.page_content)
+    print()
+
+# 或者使用通用代码分割器
+code_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=100,
+    # 代码友好的分隔符
+    separators=["\nclass ", "\ndef ", "\n\t", "\n", " ", ""]
+)</code></pre>
+                </div>
+
+                <h2>Markdown 分割</h2>
+                <p>保持 Markdown 文档结构的分割器：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_text_splitters import MarkdownHeaderTextSplitter
+
+markdown_document = """
+# 第一章：介绍
+
+LangChain 是一个强大的框架。
+
+## 1.1 核心概念
+
+- 模型（Models）
+- 提示（Prompts）
+- 链（Chains）
+
+# 第二章：快速开始
+
+安装 LangChain：
+
+\`\`\`bash
+pip install langchain
+\`\`\`
+
+## 2.1 第一个应用
+
+创建你的第一个 LangChain 应用...
+"""
+
+# 按标题分割
+markdown_splitter = MarkdownHeaderTextSplitter(
+    headers_to_split_on=[
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+)
+
+md_splits = markdown_splitter.split_text(markdown_document)
+
+# 查看分割结果
+for split in md_splits:
+    print(f"--- 块 ---")
+    print(f"元数据: {split.metadata}")
+    print(f"内容: {split.page_content[:50]}...")
+    print()</code></pre>
+                </div>
+
+                <h2>参数调优指南</h2>
+
+                <h3>chunk_size 的选择</h3>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>chunk_size</th>
+                        <th>适用场景</th>
+                        <th>优缺点</th>
+                    </tr>
+                    <tr>
+                        <td>256-500</td>
+                        <td>问答系统、精确匹配</td>
+                        <td>✓ 精度高 &nbsp; ✗ 可能丢失上下文</td>
+                    </tr>
+                    <tr>
+                        <td>500-1000</td>
+                        <td>一般 RAG 应用</td>
+                        <td>✓ 平衡 &nbsp; ✗ 需要调优</td>
+                    </tr>
+                    <tr>
+                        <td>1000-2000</td>
+                        <td>文档摘要、长篇检索</td>
+                        <td>✓ 上下文丰富 &nbsp; ✗ 噪音较多</td>
+                    </tr>
+                    <tr>
+                        <td>2000+</td>
+                        <td>完整章节检索</td>
+                        <td>✓ 完整性好 &nbsp; ✗ 检索精度低</td>
+                    </tr>
+                </table>
+
+                <h3>chunk_overlap 的设置</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># 推荐重叠比例：10-20%
+chunk_size = 1000
+chunk_overlap = 200  # 20%
+
+# 对于需要更多上下文的场景
+chunk_size = 2000
+chunk_overlap = 400  # 20%
+
+# 对于精确匹配场景，可以减少重叠
+chunk_size = 500
+chunk_overlap = 50   # 10%</code></pre>
+                </div>
+
+                <h2>分割效果可视化</h2>
+
+                <pre class="mermaid">graph LR
+    A[原始文档] --> B[chunk_size=1000]
+    B --> C[chunk_overlap=200]
+
+    C --> D1[块1: 0-1000]
+    C --> D2[块2: 800-1800]
+    C --> D3[块3: 1600-2600]
+
+    D1 -.重叠.-> D2
+    D2 -.重叠.-> D3
+
+    style D1 fill:#c8e6c9
+    style D2 fill:#c8e6c9
+    style D3 fill:#c8e6c9</code></pre>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 从 RecursiveCharacterTextSplitter 开始</h3>
+                    <ul>
+                        <li>它是大多数场景的最佳选择</li>
+                        <li>保持语义完整性和可读性</li>
+                        <li>调整 separators 以适应不同语言</li>
+                    </ul>
+
+                    <h3>2. 根据内容类型选择分割器</h3>
+                    <ul>
+                        <li>代码：使用专门的 CodeTextSplitter</li>
+                        <li>Markdown：使用 MarkdownHeaderTextSplitter</li>
+                        <li>中文文本：调整 separators 包含中文标点</li>
+                    </ul>
+
+                    <h3>3. 合理设置 chunk_size 和 chunk_overlap</h3>
+                    <ul>
+                        <li>chunk_size 通常设置为 500-1500</li>
+                        <li>chunk_overlap 设置为 chunk_size 的 10-20%</li>
+                        <li>根据检索效果动态调整</li>
+                    </ul>
+
+                    <h3>4. 保留元数据</h3>
+                    <ul>
+                        <li>分割后保留原始文档的元数据</li>
+                        <li>添加 chunk_id 和 chunk_index</li>
+                        <li>方便后续追踪和去重</li>
+                    </ul>
+
+                    <h3>5. 测试分割效果</h3>
+                    <ul>
+                        <li>检查分割点是否合理</li>
+                        <li>验证重叠是否有效</li>
+                        <li>确保没有截断重要信息</li>
+                    </ul>
+                </div>
+
+                <h2>常见问题</h2>
+
+                <div class="warning" data-label="问题：单句过长">
+                    <strong>问题</strong>：一个句子超过 chunk_size 怎么办？
+                    <br><br>
+                    <strong>解决</strong>：使用 RecursiveCharacterTextSplitter，它会尝试用更小的分隔符（如空格、标点）来分割。
+                </div>
+
+                <div class="warning" data-label="问题：丢失上下文">
+                    <strong>问题</strong>：分割后的块缺少必要上下文。
+                    <br><br>
+                    <strong>解决</strong>：增加 chunk_overlap，或考虑使用 Parent Document Retriever。
+                </div>
+
+                <div class="warning" data-label="问题：中文分割效果差">
+                    <strong>问题</strong>：中文文本分割效果不好。
+                    <br><br>
+                    <strong>解决</strong>：调整 separators 包含中文标点符号：["\n\n", "\n", "。", "！", "？", "，", " ", ""]
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 以下哪个是 LangChain 推荐的默认文本分割器？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. CharacterTextSplitter</div>
+                            <div class="option correct-option">B. RecursiveCharacterTextSplitter</div>
+                            <div class="option">C. SemanticTextSplitter</div>
+                            <div class="option">D. MarkdownTextSplitter</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. chunk_overlap 的作用是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 控制文本块的大小</div>
+                            <div class="option">B. 设置分隔符列表</div>
+                            <div class="option correct-option">C. 在相邻块之间创建重叠，避免丢失上下文</div>
+                            <div class="option">D. 限制分割的块数量</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. 哪种分割器需要使用嵌入模型？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. RecursiveCharacterTextSplitter</div>
+                            <div class="option">B. CharacterTextSplitter</div>
+                            <div class="option correct-option">C. SemanticTextSplitter</div>
+                            <div class="option">D. PythonCodeTextSplitter</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：创建一个适用于中文文本的分割器
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=____,
+    separators=["\n\n", "\n", "。", "！", "？", "____", ""]
+)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个分割器，将 PDF 文档分割成块，要求：每个块 800 字符，重叠 150 字符，保留页码元数据
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你正在为一个法律文档库构建 RAG 系统。这些文档有严格的章节结构，每个条款都很重要。你会如何设计分割策略？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="07-document-loaders.html">← 上一章：文档加载</a>
+                    <a href="09-output-parsers.html" class="next">下一章：输出解析 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

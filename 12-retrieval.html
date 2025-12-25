@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 检索 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-retrieval">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>RAG 检索 (Retrieval)</h1>
+                <p class="subtitle">检索增强生成 - 文档问答系统</p>
+
+                <h2>什么是 RAG？</h2>
+                <p><strong>RAG (Retrieval-Augmented Generation)</strong> 是一种结合检索和生成的技术：</p>
+                <ol>
+                    <li>将文档分割成小块并向量化</li>
+                    <li>存储到向量数据库</li>
+                    <li>用户查询时检索相关文档</li>
+                    <li>将检索结果作为上下文传递给 LLM</li>
+                    <li>LLM 基于上下文生成答案</li>
+                </ol>
+
+                <pre class="mermaid">graph LR
+    A[用户问题] --> B[向量化问题]
+    C[文档库] --> D[向量存储]
+    B --> D
+    D --> E[相似度检索]
+    E --> F[相关文档]
+    F --> G[LLM + 上下文]
+    G --> H[生成答案]</code></pre>
+
+                <h2>基础 RAG 实现</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.documents import Document
+from langchain_chroma import Chroma
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# 1. 准备文档
+docs = [
+    Document(page_content="LangChain 是一个用于构建 LLM 应用的框架"),
+    Document(page_content="LCEL 是 LangChain 的声明式语法"),
+    Document(page_content="Agents 是可以自主决策的 AI 系统")
+]
+
+# 2. 创建向量存储
+embeddings = OpenAIEmbeddings()
+vectorstore = Chroma.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+
+# 3. 创建提示模板
+prompt = ChatPromptTemplate.from_template("""
+根据以下上下文回答问题：
+
+上下文：
+{context}
+
+问题：{question}
+
+答案：
+""")
+
+# 4. 创建 LLM
+llm = ChatOpenAI(model="gpt-4o")
+
+# 5. 组合 RAG 链
+def format_docs(docs):
+    return "\n\n".join([d.page_content for d in docs])
+
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# 6. 查询
+result = rag_chain.invoke({"question": "什么是 LCEL？"})
+print(result)</code></pre>
+                </div>
+
+                <h2>文档加载器</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import (
+    TextLoader,
+    PyPDFLoader,
+    WebBaseLoader,
+    DirectoryLoader
+)
+
+# 加载文本文件
+text_loader = TextLoader("document.txt")
+text_docs = text_loader.load()
+
+# 加载 PDF
+pdf_loader = PyPDFLoader("document.pdf")
+pdf_docs = pdf_loader.load()
+
+# 加载网页
+web_loader = WebBaseLoader("https://example.com")
+web_docs = web_loader.load()
+
+# 加载整个目录
+dir_loader = DirectoryLoader(
+    "./documents",
+    glob="**/*.txt",
+    loader_cls=TextLoader
+)
+all_docs = dir_loader.load()</code></pre>
+                </div>
+
+                <h2>文本分割器</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 创建分割器
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,          # 每块大小
+    chunk_overlap=200,         # 重叠大小
+    length_function=len,
+    separators=["\n\n", "\n", "。", "，", " ", ""]
+)
+
+# 分割文档
+splits = text_splitter.split_documents(docs)
+print(f"原始文档: {len(docs)}")
+print(f"分割后: {len(splits)}")</code></pre>
+                </div>
+
+                <h2>混合检索 (Hybrid Retrieval)</h2>
+
+                <p>混合检索结合<strong>向量检索</strong>和<strong>关键词检索</strong>（如 BM25），提高召回率：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+# 准备文档
+docs = [
+    Document(page_content="Python 是一种高级编程语言"),
+    Document(page_content="JavaScript 主要用于 Web 开发"),
+    Document(page_content="Go 语言由 Google 开发"),
+    # ... 更多文档
+]
+
+# 1. 创建向量检索器
+embeddings = OpenAIEmbeddings()
+vectorstore = Chroma.from_documents(docs, embeddings)
+vector_retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+# 2. 创建 BM25 关键词检索器
+bm25_retriever = BM25Retriever.from_documents(docs, k=5)
+
+# 3. 创建集成检索器（混合检索）
+ensemble_retriever = EnsembleRetriever(
+    retrievers=[bm25_retriever, vector_retriever],
+    weights=[0.5, 0.5]  # BM25 和向量各占 50%
+)
+
+# 使用混合检索
+query = "编程语言"
+results = ensemble_retriever.get_relevant_documents(query)
+
+for doc in results:
+    print(doc.page_content)</code></pre>
+                </div>
+
+                <pre class="mermaid">graph TD
+    A[用户查询] --> B[向量检索]
+    A --> C[BM25 检索]
+    B --> D[结果集 1]
+    C --> E[结果集 2]
+    D --> F[结果融合 RRF]
+    E --> F
+    F --> G[Top-K 结果]</code></pre>
+
+                <div class="tip" data-label="提示">
+                    <strong>RRF (Reciprocal Rank Fusion)</strong> 是常用的结果融合算法，通过排名倒数加权合并多个检索器的结果。
+                </div>
+
+                <h2>重排序 (Reranking)</h2>
+
+                <p>重排序使用更强的模型对初步检索结果进行精排，提高准确率：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain.retrievers import ContextualCompressionRetriever
+
+# 1. 创建基础检索器
+retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
+
+# 2. 创建 Cross-Encoder Reranker
+reranker = HuggingFaceCrossEncoder(
+    model_name="BAAI/bge-reranker-base"
+)
+
+# 3. 创建压缩检索器（带重排序）
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=reranker,
+    base_retriever=retriever
+)
+
+# 4. 检索并重排序
+query = "LangChain 的用途"
+results = compression_retriever.get_relevant_documents(query)
+
+# 返回重排序后的 Top-K
+for i, doc in enumerate(results):
+    print(f"{i+1}. {doc.page_content}")</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    Cross-Encoder 模型会对查询和文档的配对进行打分，比双塔模型（如 Embedding）更准确，但速度较慢。通常先检索大量文档（如 k=50），再用 Reranker 精排到 Top-10。
+                </div>
+
+                <h2>Parent Document Retriever</h2>
+
+                <p>父子文档检索策略：用<strong>小块</strong>检索，返回<strong>大块</strong>（父文档），兼顾精度和上下文完整性：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.retrievers import ParentDocumentRetriever
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.storage import InMemoryStore
+
+# 1. 父文档分割器（大块，用于返回）
+parent_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=2000,
+    chunk_overlap=200
+)
+
+# 2. 子文档分割器（小块，用于检索）
+child_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=400,
+    chunk_overlap=50
+)
+
+# 3. 向量存储（存储子文档）
+vectorstore = Chroma(
+    collection_name="full_documents",
+    embedding_function=OpenAIEmbeddings()
+)
+
+# 4. 文档存储（存储父文档）
+store = InMemoryStore()
+
+# 5. 创建 Parent Document Retriever
+retriever = ParentDocumentRetriever(
+    vectorstore=vectorstore,
+    docstore=store,
+    child_splitter=child_splitter,
+    parent_splitter=parent_splitter
+)
+
+# 6. 添加文档
+retriever.add_documents(docs)
+
+# 7. 检索：返回父文档
+query = "LangChain 框架"
+results = retriever.get_relevant_documents(query)
+
+# 返回的是父文档（更大的上下文）
+print(f"返回文档长度: {len(results[0].page_content)}")</code></pre>
+                </div>
+
+                <pre class="mermaid">graph LR
+    A[原始文档] --> B[父分割器]
+    B --> C[父文档 2000字]
+    C --> D[子分割器]
+    D --> E[子文档 400字]
+    E --> F[向量化]
+    F --> G[向量检索]
+    G --> H[返回父文档]</code></pre>
+
+                <h2>Context Compression</h2>
+
+                <p>上下文压缩：使用 LLM 提取检索文档中与查询相关的部分：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain_openai import ChatOpenAI
+
+# 1. 基础检索器
+base_retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+# 2. 创建压缩器（使用 LLM 提取相关内容）
+llm = ChatOpenAI(model="gpt-4o")
+compressor = LLMChainExtractor.from_llm(llm)
+
+# 3. 创建压缩检索器
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=compressor,
+    base_retriever=base_retriever
+)
+
+# 4. 压缩检索
+query = "什么是 LCEL？"
+compressed_docs = compression_retriever.get_relevant_documents(query)
+
+for doc in compressed_docs:
+    print(f"压缩后: {doc.page_content}")</code></pre>
+                </div>
+
+                <h2>Multi-Query Retriever</h2>
+
+                <p>多查询检索：自动生成多个查询变体，提高召回率：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain.retrievers import MultiQueryRetriever
+from langchain_openai import ChatOpenAI
+
+# 1. 创建基础检索器
+base_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+# 2. 创建多查询检索器
+llm = ChatOpenAI(model="gpt-4o")
+multi_query_retriever = MultiQueryRetriever.from_llm(
+    retriever=base_retriever,
+    llm=llm
+)
+
+# 3. 查询：自动生成多个查询并合并结果
+query = "如何使用 LangChain 构建应用？"
+results = multi_query_retriever.get_relevant_documents(query)
+
+# 会去重后返回更多相关结果
+print(f"检索到 {len(results)} 个结果")</code></pre>
+                </div>
+
+                <h2>MMR 检索（多样性）</h2>
+
+                <p><strong>MMR (Max Marginal Relevance)</strong> 在相关性和多样性之间取得平衡：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># 创建 MMR 检索器
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 5,              # 返回 5 个结果
+        "fetch_k": 20,       # 从 20 个候选中选择
+        "lambda_mult": 0.5   # 0.5 平衡相关性和多样性
+    }
+)
+
+# lambda_mult 参数说明：
+# - 1.0: 只考虑相关性（标准检索）
+# - 0.0: 只考虑多样性
+# - 0.5: 平衡两者（推荐）
+
+results = retriever.get_relevant_documents("Python 编程")</code></pre>
+                </div>
+
+                <div class="tip" data-label="应用场景">
+                    MMR 特别适合以下场景：用户需要多样化的信息、避免重复内容、探索性搜索。
+                </div>
+
+                <h2>查询改写</h2>
+
+                <p>使用 LLM 改写用户查询，使其更适合检索：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
+
+# 查询改写提示
+rewrite_prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个查询改写专家。将用户查询改写为更适合检索的形式，保持原意不变。"),
+    ("user", "原始查询: {query}\n\n改写后的查询:")
+])
+
+# 创建改写链
+llm = ChatOpenAI(model="gpt-4o")
+rewrite_chain = rewrite_prompt | llm | StrOutputParser()
+
+# 改写查询
+original_query = "LangChain 怎么搞"
+rewritten_query = rewrite_chain.invoke({"query": original_query})
+
+print(f"原始: {original_query}")
+print(f"改写: {rewritten_query}")
+# 输出: "如何使用 LangChain 框架构建应用"
+
+# 使用改写后的查询检索
+results = vectorstore.similarity_search(rewritten_query, k=5)</code></pre>
+                </div>
+
+                <h2>RAG 评估（RAGAS）</h2>
+
+                <p>使用 RAGAS 框架评估 RAG 系统质量：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,    # 忠实度：答案是否基于检索的上下文
+    answer_relevancy,  # 相关性：答案是否回答了问题
+    context_recall,    # 召回率：检索的上下文是否包含必要信息
+    context_precision  # 精确率：检索的上下文是否相关
+)
+from datasets import Dataset
+
+# 准备评估数据
+eval_data = {
+    "question": [
+        "什么是 LangChain？",
+        "LCEL 是什么？"
+    ],
+    "answer": [
+        "LangChain 是 LLM 应用框架",
+        "LCEL 是 LangChain 的表达式语言"
+    ],
+    "contexts": [
+        ["LangChain 是框架...", "用于构建 LLM 应用..."],
+        ["LCEL 是声明式语法...", "使用 | 操作符..."]
+    ],
+    "ground_truths": [
+        "LangChain 是一个用于构建大语言模型应用的框架",
+        "LCEL 是 LangChain Expression Language，是一种声明式语法"
+    ]
+}
+
+dataset = Dataset.from_dict(eval_data)
+
+# 运行评估
+result = evaluate(
+    dataset,
+    metrics=[
+        faithfulness,
+        answer_relevancy,
+        context_recall,
+        context_precision
+    ]
+)
+
+# 查看结果
+print(result)
+
+# 输出示例:
+# faithfulness: 0.95
+# answer_relevancy: 0.88
+# context_recall: 0.92
+# context_precision: 0.90</code></pre>
+                </div>
+
+                <pre class="mermaid">graph TD
+    A[RAG 评估指标] --> B[忠实度 Faithfulness]
+    A --> C[相关性 Relevancy]
+    A --> D[召回率 Recall]
+    A --> E[精确率 Precision]
+    B --> F[答案是否基于上下文]
+    C --> G[答案是否回答问题]
+    D --> H[上下文是否包含必要信息]
+    E --> I[上下文是否相关]</code></pre>
+
+                <div class="warning" data-label="评估建议">
+                    建议定期评估 RAG 系统，特别是在以下情况：添加新文档、修改检索策略、更换 LLM 模型时。
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="08-embeddings.html" class="prev">← 嵌入向量</a>
+                    <a href="10-best-practices.html" class="next">最佳实践 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 混合检索主要结合哪两种检索方式？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 向量检索 + 全文检索</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 向量检索 + BM25 关键词检索</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 向量检索 + BM25 关键词检索</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. BM25 + 全文检索</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. Parent Document Retriever 的主要优势是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">A. 用小块检索，返回大块（父文档）</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 提高检索速度</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 减少存储空间</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 自动文档生成</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. MMR 检索中 lambda_mult=0.5 表示什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 只考虑相关性</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 只考虑多样性</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 平衡相关性和多样性</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 忽略所有因素</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全以下混合检索的代码
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                            </div>
+                            <pre><code class="language-python">from langchain.retrievers import EnsembleRetriever
+
+ensemble_retriever = EnsembleRetriever(
+    retrievers=[______, ______],
+    weights=[0.5, 0.5]
+)</code></pre>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                                <code>bm25_retriever, vector_retriever</code>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 实现一个完整的 RAG 流程，包含：查询改写 → 混合检索 → Rerank
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain.retrievers import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain_chroma import Chroma
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+# 1. 查询改写链
+rewrite_prompt = ChatPromptTemplate.from_template("""
+改写以下查询，使其更适合检索：
+原始查询: {query}
+改写查询:
+""")
+llm = ChatOpenAI(model="gpt-4o")
+rewrite_chain = rewrite_prompt | llm | StrOutputParser()
+
+# 2. 混合检索器
+vectorstore = Chroma.from_documents(docs, OpenAIEmbeddings())
+vector_retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
+bm25_retriever = BM25Retriever.from_documents(docs, k=10)
+hybrid_retriever = EnsembleRetriever(
+    retrievers=[bm25_retriever, vector_retriever],
+    weights=[0.5, 0.5]
+)
+
+# 3. Reranker
+reranker = HuggingFaceCrossEncoder(model_name="BAAI/bge-reranker-base")
+rerank_retriever = ContextualCompressionRetriever(
+    base_compressor=reranker,
+    base_retriever=hybrid_retriever
+)
+
+# 4. 完整流程
+query = "LangChain 怎么用"
+rewritten = rewrite_chain.invoke({"query": query})
+results = rerank_retriever.get_relevant_documents(rewritten)</code></pre>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你需要为一个企业构建 RAG 文档问答系统，处理 10 万份文档，要求响应时间 < 3 秒，如何设计？
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考方案</summary>
+                            <div style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                                <strong>方案要点：</strong>
+                                <ul>
+                                    <li><strong>向量数据库</strong>：使用 Chroma/FAISS 存储嵌入</li>
+                                    <li><strong>混合检索</strong>：结合向量 + BM25 提高准确率</li>
+                                    <li><strong>Rerank</strong>：先用 BM25+向量召回 Top-50，再用 Reranker 精排到 Top-10</li>
+                                    <li><strong>缓存层</strong>：对常见问题添加缓存</li>
+                                    <li><strong>流式输出</strong>：改善用户体验</li>
+                                    <li><strong>并发处理</strong>：使用 abatch 批量处理请求</li>
+                                    <li><strong>监控</strong>：使用 RAGAS 定期评估质量</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            7. RAGAS 框架中的 faithfulness 指标衡量什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 检索速度</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 答案是否基于检索的上下文</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 检索结果数量</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. LLM 成本</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            8. Context Compression 的主要作用是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 压缩文档存储空间</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 加快检索速度</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 提取检索文档中与查询相关的内容</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 减少 LLM 调用成本</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回调系统 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-callbacks">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>回调系统</h1>
+                <p class="subtitle">监听和响应 LangChain 运行时事件</p>
+
+                <h2>什么是回调系统？</h2>
+                <p>回调系统让你能够在 LangChain 组件运行的不同阶段拦截和响应事件。这就像在程序运行时设置"监听器"，当特定事件发生时执行自定义逻辑：</p>
+                <ul>
+                    <li><strong>日志记录</strong>：记录所有的输入输出</li>
+                    <li><strong>性能监控</strong>：跟踪 token 使用和执行时间</li>
+                    <li><strong>调试</strong>：查看每一步的执行细节</li>
+                    <li><strong>自定义处理</strong>：在特定事件触发时执行操作</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    回调系统类似于 Node.js 的中间件或 Express 的拦截器——它让你在数据流动的不同节点"插入"自己的代码。
+                </div>
+
+                <h2>回调事件生命周期</h2>
+
+                <pre class="mermaid">sequenceDiagram
+    participant User
+    participant Chain
+    participant Callback
+    participant LLM
+
+    User->>Chain: invoke()
+    Chain->>Callback: on_chain_start()
+    Chain->>LLM: 调用模型
+    Callback->>Callback: on_llm_start()
+    LLM->>Callback: on_llm_new_token() (流式)
+    LLM->>Callback: on_llm_end()
+    LLM-->>Chain: 返回结果
+    Chain->>Callback: on_chain_end()
+    Chain-->>User: 最终结果
+
+    Note over Callback: 在每个阶段都可以<br/>记录日志、修改数据或触发操作</code></pre>
+
+                <h2>内置回调处理器</h2>
+
+                <h3>1. StdOutCallbackHandler</h3>
+                <p>将事件输出到控制台，最简单的调试工具：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.callbacks import StdOutCallbackHandler
+
+# 创建带标准输出的回调
+handler = StdOutCallbackHandler()
+
+# 在 LLM 上使用
+llm = ChatOpenAI(model="gpt-4o")
+
+response = llm.invoke(
+    "介绍一下 LangChain",
+    config={"callbacks": [handler]}
+)
+# 输出：
+# [chain/start] Entering Chain run with input: "介绍一下 LangChain"
+# [llm/start] Entering LLM run with input: {...}
+# [llm/end] Finished LLM run with output: {...}
+# [chain/end] Finished Chain run</code></pre>
+                </div>
+
+                <h3>2. TokenCounterCallback</h3>
+                <p>统计 token 使用情况：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+from langchain_openai import ChatOpenAI
+from typing import Dict, Any
+
+class TokenCounterCallback(BaseCallbackHandler):
+    """统计 token 使用"""
+
+    def __init__(self):
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_tokens = 0
+
+    def on_llm_end(self, response: Any, **kwargs) -> None:
+        """LLM 调用结束时触发"""
+        # 获取 token 使用情况
+        token_usage = response.llm_output.get("token_usage", {})
+
+        self.prompt_tokens += token_usage.get("prompt_tokens", 0)
+        self.completion_tokens += token_usage.get("completion_tokens", 0)
+        self.total_tokens += token_usage.get("total_tokens", 0)
+
+        print(f"\n--- Token 使用统计 ---")
+        print(f"输入 tokens: {self.prompt_tokens}")
+        print(f"输出 tokens: {self.completion_tokens}")
+        print(f"总计 tokens: {self.total_tokens}")
+        print(f"预估成本: ${self.total_tokens * 0.00001:.4f}")
+
+# 使用
+counter = TokenCounterCallback()
+llm = ChatOpenAI(model="gpt-4o")
+
+response = llm.invoke(
+    "写一个 Python 函数来计算斐波那契数列",
+    config={"callbacks": [counter]}
+)</code></pre>
+                </div>
+
+                <h3>3. FileCallbackHandler</h3>
+                <p>将日志输出到文件：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import FileCallbackHandler
+
+# 创建文件日志处理器
+logfile = FileCallbackHandler("langchain.log")
+
+# 在链上使用
+from langchain.chains import LLMChain
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate.from_template("讲一个关于{topic}的故事")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 所有日志会写入 langchain.log
+chain.invoke(
+    {"topic": "人工智能"},
+    config={"callbacks": [logfile]}
+)</code></pre>
+                </div>
+
+                <h2>自定义回调处理器</h2>
+                <p>创建你自己的回调处理器来处理特定事件：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+from typing import Any, Dict, List
+import json
+
+class CustomLoggingCallback(BaseCallbackHandler):
+    """自定义日志回调"""
+
+    def __init__(self, log_file: str = "execution_log.json"):
+        self.log_file = log_file
+        self.events = []
+
+    def on_llm_start(
+        self, prompts: List[str], **kwargs: Any
+    ) -> None:
+        """LLM 开始调用时"""
+        event = {
+            "event": "llm_start",
+            "prompts": prompts,
+            "timestamp": self._get_timestamp()
+        }
+        self.events.append(event)
+        print(f"🚀 LLM 开始处理: {prompts[0][:50]}...")
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """新 token 生成时（流式）"""
+        print(token, end="", flush=True)
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """LLM 调用结束时"""
+        event = {
+            "event": "llm_end",
+            "output": response.generations[0][0].text,
+            "token_usage": response.llm_output.get("token_usage", {}),
+            "timestamp": self._get_timestamp()
+        }
+        self.events.append(event)
+        print("\n✅ LLM 调用完成")
+
+    def on_chain_start(
+        self, inputs: Dict[str, Any], **kwargs: Any
+    ) -> None:
+        """链开始执行时"""
+        event = {
+            "event": "chain_start",
+            "inputs": inputs,
+            "timestamp": self._get_timestamp()
+        }
+        self.events.append(event)
+        print(f"⛓️ 链开始执行，输入: {inputs}")
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """链执行结束时"""
+        event = {
+            "event": "chain_end",
+            "outputs": outputs,
+            "timestamp": self._get_timestamp()
+        }
+        self.events.append(event)
+        print(f"✅ 链执行完成，输出: {outputs}")
+
+        # 保存日志到文件
+        self._save_log()
+
+    def on_chain_error(
+        self, error: Exception, **kwargs: Any
+    ) -> None:
+        """链执行出错时"""
+        event = {
+            "event": "chain_error",
+            "error": str(error),
+            "timestamp": self._get_timestamp()
+        }
+        self.events.append(event)
+        print(f"❌ 链执行出错: {error}")
+
+    def _get_timestamp(self) -> str:
+        """获取当前时间戳"""
+        from datetime import datetime
+        return datetime.now().isoformat()
+
+    def _save_log(self) -> None:
+        """保存日志到文件"""
+        with open(self.log_file, "w", encoding="utf-8") as f:
+            json.dump(self.events, f, ensure_ascii=False, indent=2)
+
+# 使用自定义回调
+callback = CustomLoggingCallback()
+
+llm = ChatOpenAI(model="gpt-4o")
+response = llm.invoke(
+    "用一句话介绍 Python",
+    config={"callbacks": [callback]}
+)</code></pre>
+                </div>
+
+                <h2>回调处理器类图</h2>
+
+                <pre class="mermaid">classDiagram
+    class BaseCallbackHandler {
+        <<abstract>>
+        +on_llm_start()
+        +on_llm_end()
+        +on_llm_new_token()
+        +on_llm_error()
+        +on_chain_start()
+        +on_chain_end()
+        +on_chain_error()
+        +on_tool_start()
+        +on_tool_end()
+        +on_tool_error()
+        +on_chat_model_start()
+        +on_chat_model_end()
+        +on_chat_model_new_token()
+        +on_chat_model_error()
+    }
+
+    class StdOutCallbackHandler {
+        +on_llm_start()
+        +on_llm_end()
+        +on_chain_start()
+        +on_chain_end()
+    }
+
+    class TokenCounterCallback {
+        -prompt_tokens: int
+        -completion_tokens: int
+        -total_tokens: int
+        +on_llm_end()
+        +get_summary()
+    }
+
+    class CustomLoggingCallback {
+        -events: list
+        -log_file: str
+        +on_llm_start()
+        +on_llm_end()
+        +on_chain_start()
+        +on_chain_end()
+        +on_chain_error()
+        +_save_log()
+    }
+
+    BaseCallbackHandler <|-- StdOutCallbackHandler
+    BaseCallbackHandler <|-- TokenCounterCallback
+    BaseCallbackHandler <|-- CustomLoggingCallback</code></pre>
+
+                <h2>在链上使用回调</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.callbacks import BaseCallbackHandler
+
+# 定义回调
+class TimingCallback(BaseCallbackHandler):
+    """记录执行时间"""
+    import time
+    start_times = {}
+
+    def on_chain_start(self, inputs, **kwargs):
+        self.start_times['chain'] = self.time.time()
+
+    def on_chain_end(self, outputs, **kwargs):
+        duration = self.time.time() - self.start_times['chain']
+        print(f"⏱️ 链执行耗时: {duration:.2f}秒")
+
+# 创建链
+prompt = ChatPromptTemplate.from_template("讲一个关于{topic}的{length}故事")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 使用回调
+timing = TimingCallback()
+response = chain.invoke(
+    {"topic": "太空探索", "length": "简短"},
+    config={"callbacks": [timing]}
+)</code></pre>
+                </div>
+
+                <h2>使用装饰器添加回调</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import callback_handler
+
+@callback_handler  # 将类注册为回调处理器
+class MetricsCallback(BaseCallbackHandler):
+    """收集指标的回调"""
+
+    def __init__(self):
+        self.metrics = {
+            "total_calls": 0,
+            "total_tokens": 0,
+            "errors": 0
+        }
+
+    def on_llm_start(self, prompts, **kwargs):
+        self.metrics["total_calls"] += 1
+
+    def on_llm_end(self, response, **kwargs):
+        tokens = response.llm_output.get("token_usage", {}).get("total_tokens", 0)
+        self.metrics["total_tokens"] += tokens
+
+    def on_llm_error(self, error, **kwargs):
+        self.metrics["errors"] += 1
+
+# 使用
+metrics = MetricsCallback()
+llm = ChatOpenAI(model="gpt-4o")
+
+for _ in range(5):
+    llm.invoke("你好", config={"callbacks": [metrics]})
+
+print(f"总调用次数: {metrics.metrics['total_calls']}")
+print(f"总 token 数: {metrics.metrics['total_tokens']}")
+print(f"错误次数: {metrics.metrics['errors']}")</code></pre>
+                </div>
+
+                <h2>异步回调支持</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+from typing import Any, Dict, List
+import asyncio
+
+class AsyncCallbackHandler(BaseCallbackHandler):
+    """异步回调处理器"""
+
+    # 同步方法
+    def on_llm_start(self, prompts: List[str], **kwargs: Any) -> None:
+        print(f"同步: LLM 开始")
+
+    # 异步方法
+    async def on_llm_start_async(
+        self, prompts: List[str], **kwargs: Any
+    ) -> None:
+        await asyncio.sleep(0.1)  # 模拟异步操作
+        print(f"异步: LLM 开始")
+
+    async def on_llm_end_async(self, response: LLMResult, **kwargs: Any) -> None:
+        # 可以在这里执行异步操作，如写入数据库
+        await asyncio.sleep(0.1)
+        print(f"异步: LLM 结束")
+
+# 使用异步回调
+async def main():
+    from langchain_openai import AsyncChatOpenAI
+
+    callback = AsyncCallbackHandler()
+    llm = AsyncChatOpenAI(model="gpt-4o")
+
+    response = await llm.ainvoke(
+        "你好",
+        config={"callbacks": [callback]}
+    )
+
+asyncio.run(main())</code></pre>
+                </div>
+
+                <h2>回调继承与组合</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+
+# 基础回调
+class BaseMetricsCallback(BaseCallbackHandler):
+    def __init__(self):
+        self.metrics = {}
+
+    def get_metrics(self):
+        return self.metrics
+
+# 继承并扩展
+class DetailedMetricsCallback(BaseMetricsCallback):
+    def on_llm_end(self, response, **kwargs):
+        usage = response.llm_output.get("token_usage", {})
+        self.metrics.update({
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0)
+        })
+
+# 多个回调一起使用
+from langchain_openai import ChatOpenAI
+
+metrics = DetailedMetricsCallback()
+timing = TimingCallback()
+
+# 可以传入多个回调
+llm = ChatOpenAI(model="gpt-4o")
+response = llm.invoke(
+    "你好",
+    config={"callbacks": [metrics, timing]}
+)
+
+print(metrics.get_metrics())</code></pre>
+                </div>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 只实现需要的方法</h3>
+                    <ul>
+                        <li>不需要重写所有回调方法</li>
+                        <li>只实现你关心的事件处理</li>
+                        <li>使用 <code>raise NotImplementedError</code> 标记不支持的回调</li>
+                    </ul>
+
+                    <h3>2. 保持回调轻量</h3>
+                    <ul>
+                        <li>避免在回调中执行耗时操作</li>
+                        <li>考虑使用异步处理 IO 操作</li>
+                        <li>使用队列或后台线程处理复杂逻辑</li>
+                    </ul>
+
+                    <h3>3. 错误处理</h3>
+                    <ul>
+                        <li>回调中的错误不应影响主流程</li>
+                        <li>实现 <code>on_*_error</code> 方法处理错误</li>
+                        <li>记录异常用于调试</li>
+                    </ul>
+
+                    <h3>4. 避免无限循环</h3>
+                    <ul>
+                        <li>不要在回调中触发相同的调用</li>
+                        <li>使用标志位防止重复触发</li>
+                    </ul>
+
+                    <h3>5. 测试回调</h3>
+                    <ul>
+                        <li>单元测试每个回调方法</li>
+                        <li>模拟不同场景（成功、失败、超时）</li>
+                        <li>验证回调是否按预期触发</li>
+                    </ul>
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 哪个方法在 LLM 调用开始时触发？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. on_llm_end</div>
+                            <div class="option correct-option">B. on_llm_start</div>
+                            <div class="option">C. on_chain_start</div>
+                            <div class="option">D. on_llm_new_token</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 如何在链上使用多个回调处理器？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 使用回调装饰器</div>
+                            <div class="option correct-option">B. 传入列表 config={"callbacks": [cb1, cb2]}</div>
+                            <div class="option">C. 只能使用一个回调</div>
+                            <div class="option">D. 使用链式调用</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. 哪个回调方法在流式输出时每个 token 生成后触发？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. on_llm_start</div>
+                            <div class="option">B. on_llm_end</div>
+                            <div class="option correct-option">C. on_llm_new_token</div>
+                            <div class="option">D. on_chat_model_start</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：创建一个统计 API 调用次数的回调
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langchain_core.callbacks import BaseCallbackHandler
+
+class APICounterCallback(BaseCallbackHandler):
+    def __init__(self):
+        self.call_count = 0
+
+    def on_llm_start(self, prompts, **kwargs):
+        self.call_count += ____
+        print(f"API 调用次数: {self.call_count}")
+
+counter = APICounterCallback()
+llm.invoke("你好", config={"callbacks": [____]})</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个回调处理器，记录每次 LLM 调用的输入和输出到 JSON 文件
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你正在构建一个生产环境的 RAG 应用，需要监控所有组件的执行时间、token 使用和错误率。你会如何设计回调系统？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="12-retrieval.html">← 上一章：RAG检索</a>
+                    <a href="14-streaming.html" class="next">下一章：流式处理 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

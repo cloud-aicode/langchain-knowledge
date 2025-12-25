@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检索器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-retrievers">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>检索器 API</h1>
+                <p class="subtitle">BaseRetriever 与文档检索</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#types" class="api-nav-link">检索器类型</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>检索器是 LangChain 中获取相关文档的标准接口，通常基于向量存储实现语义搜索。</p>
+
+                <pre class="mermaid">graph TD
+                    A[BaseRetriever] --> B[VectorStoreRetriever]
+                    A --> C[BM25Retriever]
+                    A --> D[MultiQueryRetriever]
+                    A --> E[ContextualCompressionRetriever]
+                    A --> F[EnsembleRetriever]
+                    A --> G[ParentDocumentRetriever]
+                    A --> H[SelfQueryRetriever]
+
+                    B --> I[相似度检索]
+                    B --> J[MMR 检索]
+
+                    style A fill:#e1f5fe
+                    style B fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">BaseRetriever</h3>
+                    <p class="api-description">所有检索器的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.retrievers import BaseRetriever
+
+class BaseRetriever(Runnable[str, List[Document]], ABC):
+    """检索器基类"""
+
+    # 必须实现的方法
+    @abstractmethod
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: Optional[CallbackManagerForRetrieverRun] = None,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        获取相关文档（子类实现）
+
+        Args:
+            query: 查询文本
+            run_manager: 回调管理器
+            **kwargs: 额外参数
+
+        Returns:
+            相关文档列表
+        """
+
+    async def _aget_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: Optional[CallbackManagerForRetrieverRun] = None,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        异步获取相关文档（子类可选实现）
+
+        默认调用 _get_relevant_documents
+        """
+        return await asyncio.to_thread(
+            self._get_relevant_documents,
+            query,
+            run_manager=run_manager,
+            **kwargs
+        )
+
+    # 公共接口
+    def get_relevant_documents(
+        self,
+        query: str,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        获取相关文档
+
+        Args:
+            query: 查询文本
+            **kwargs: 额外参数
+
+        Returns:
+            相关文档列表
+        """
+
+    async def aget_relevant_documents(
+        self,
+        query: str,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """异步获取相关文档"""
+
+    # Runnable 接口实现
+    def invoke(
+        self,
+        input: str,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        调用检索器（Runnable 接口）
+
+        Args:
+            input: 查询文本
+            config: 运行配置
+            **kwargs: 额外参数
+
+        Returns:
+            相关文档列表
+        """
+
+    async def ainvoke(
+        self,
+        input: str,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """异步调用检索器"""
+
+    def bind(self, **kwargs: Any) -> "BaseRetriever":
+        """
+        绑定参数
+
+        Args:
+            **kwargs: 要绑定的参数
+
+        Returns:
+            绑定参数后的检索器
+        """
+
+    def with_config(
+        self,
+        config: RunnableConfig,
+    ) -> "BaseRetriever":
+        """
+        绑定配置
+
+        Args:
+            config: 运行配置
+
+        Returns:
+            带配置的检索器
+        """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="types">检索器类型</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">VectorStoreRetriever</h3>
+                    <p class="api-description">向量存储检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.vectorstores import VectorStoreRetriever
+
+class VectorStoreRetriever(BaseRetriever):
+    """向量存储检索器"""
+
+    vectorstore: VectorStore
+    """关联的向量存储"""
+
+    search_type: Literal["similarity", "mmr"] = "similarity"
+    """搜索类型"""
+
+    search_kwargs: Dict[str, Any] = {}
+    """搜索参数"""
+
+    # 常用搜索参数:
+    # k: 返回文档数量
+    # score_threshold: 相似度阈值
+    # fetch_k: MMR 候选数量
+    # lambda_mult: MMR 平衡参数
+    # filter: 元数据过滤条件
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        获取相关文档
+
+        Args:
+            query: 查询文本
+            **kwargs: 临时覆盖 search_kwargs
+
+        Returns:
+            相关文档列表
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+# 创建向量存储
+vectorstore = Chroma.from_texts(
+    texts=["文档1", "文档2", "文档3"],
+    embedding=OpenAIEmbeddings()
+)
+
+# 转换为检索器
+retriever = vectorstore.as_retriever()
+
+# 自定义检索器
+retriever = vectorstore.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 3}
+)
+
+# MMR 检索器
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 3,
+        "fetch_k": 10,
+        "lambda_mult": 0.5
+    }
+)
+
+# 使用检索器
+docs = retriever.invoke("查询文本")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">BM25Retriever</h3>
+                    <p class="api-description">BM25 关键词检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.retrievers import BM25Retriever
+
+class BM25Retriever(BaseRetriever):
+    """BM25 检索器"""
+
+    def __init__(
+        self,
+        documents: List[Document],
+        k: int = 4,
+        bm25_params: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        初始化 BM25 检索器
+
+        Args:
+            documents: 文档列表
+            k: 返回文档数量
+            bm25_params: BM25 参数
+                - k1: 词频饱和参数 (默认 1.5)
+                - b: 长度归一化参数 (默认 0.75)
+                - epsilon: IDF 下界 (默认 0.25)
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.retrievers import BM25Retriever
+from langchain_core.documents import Document
+
+documents = [
+    Document(page_content="Python 是一种编程语言"),
+    Document(page_content="JavaScript 也是一种编程语言")
+]
+
+retriever = BM25Retriever.from_documents(
+    documents,
+    k=2,
+    bm25_params={"k1": 1.5, "b": 0.75}
+)
+
+docs = retriever.invoke("编程语言")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">MultiQueryRetriever</h3>
+                    <p class="api-description">多查询检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import MultiQueryRetriever
+
+class MultiQueryRetriever(BaseRetriever):
+    """多查询检索器"""
+
+    retriever: BaseRetriever
+    """底层检索器"""
+
+    llm_chain: Runnable
+    """生成查询的 LLM 链"""
+
+    parser_key: str = "lines"
+    """解析键"""
+
+    include_original: bool = True
+    """是否包含原始查询"""
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        使用多个查询检索
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.retrievers import MultiQueryRetriever
+from langchain_openai import ChatOpenAI
+from langchain_chroma import Chroma
+
+# 创建基础检索器
+vectorstore = Chroma.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings()
+)
+base_retriever = vectorstore.as_retriever()
+
+# 创建多查询检索器
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+retriever = MultiQueryRetriever.from_llm(
+    retriever=base_retriever,
+    llm=llm,
+    include_original=True
+)
+
+docs = retriever.invoke("查询文本")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ContextualCompressionRetriever</h3>
+                    <p class="api-description">上下文压缩检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import ContextualCompressionRetriever
+
+class ContextualCompressionRetriever(BaseRetriever):
+    """上下文压缩检索器"""
+
+    base_compressor: BaseDocumentCompressor
+    """文档压缩器"""
+
+    base_retriever: BaseRetriever
+    """基础检索器"""
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """
+        检索并压缩文档
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain_openai import ChatOpenAI
+
+# 基础检索器
+vectorstore = Chroma.from_texts(
+    texts=["长文档1...", "长文档2..."],
+    embedding=OpenAIEmbeddings()
+)
+base_retriever = vectorstore.as_retriever()
+
+# 压缩器
+llm = ChatOpenAI(model="gpt-4o")
+compressor = LLMChainExtractor.from_llm(llm)
+
+# 压缩检索器
+retriever = ContextualCompressionRetriever(
+    base_compressor=compressor,
+    base_retriever=base_retriever
+)
+
+docs = retriever.invoke("查询文本")
+# 返回压缩后的相关片段</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">EnsembleRetriever</h3>
+                    <p class="api-description">集成检索器（合并多个检索器）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import EnsembleRetriever
+
+class EnsembleRetriever(BaseRetriever):
+    """集成检索器"""
+
+    retrievers: List[BaseRetriever]
+    """检索器列表"""
+
+    weights: Optional[List[float]] = None
+    """权重列表"""
+
+    ranking_key: str = "score"
+    """排序键"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.retrievers import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
+from langchain_chroma import Chroma
+
+# 向量检索器
+vectorstore = Chroma.from_texts(
+    texts=["文档1", "文档2"],
+    embedding=OpenAIEmbeddings()
+)
+vector_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+# 关键词检索器
+bm25_retriever = BM25Retriever.from_texts(
+    texts=["文档1", "文档2"],
+    k=3
+)
+
+# 集成检索器
+ensemble_retriever = EnsembleRetriever(
+    retrievers=[vector_retriever, bm25_retriever],
+    weights=[0.5, 0.5]
+)
+
+docs = ensemble_retriever.invoke("查询文本")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ParentDocumentRetriever</h3>
+                    <p class="api-description">父子文档检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import ParentDocumentRetriever
+
+class ParentDocumentRetriever(BaseRetriever):
+    """父子文档检索器"""
+
+    vectorstore: VectorStore
+    """子文档向量存储"""
+
+    docstore: BaseStore[str, Document]
+    """父文档存储"""
+
+    child_splitter: TextSplitter
+    """子文档分割器"""
+
+    parent_splitter: Optional[TextSplitter] = None
+    """父文档分割器"""
+
+    id_key: str = "doc_id"
+    """ID 键名"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.retrievers import ParentDocumentRetriever
+from langchain.storage import InMemoryStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# 分割器
+parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2000)
+child_splitter = RecursiveCharacterTextSplitter(chunk_size=400)
+
+# 创建检索器
+retriever = ParentDocumentRetriever(
+    vectorstore=Chroma(embedding_function=OpenAIEmbeddings()),
+    docstore=InMemoryStore(),
+    child_splitter=child_splitter,
+    parent_splitter=parent_splitter
+)
+
+# 添加文档
+retriever.add_documents([Document(page_content="长文档...")])
+
+# 检索（返回父文档）
+docs = retriever.invoke("查询文本")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">SelfQueryRetriever</h3>
+                    <p class="api-description">自查询检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import SelfQueryRetriever
+
+class SelfQueryRetriever(BaseRetriever):
+    """自查询检索器"""
+
+    vectorstore: VectorStore
+    """向量存储"""
+
+    llm_chain: Runnable
+    """查询理解链"""
+
+    structured_query_translator: BaseStructuredQueryTranslator
+    """查询转换器"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.retrievers import SelfQueryRetriever
+from langchain.chains.query_constructor.base import AttributeInfo
+from langchain_openai import ChatOpenAI
+
+# 定义元数据字段
+metadata_field_info = [
+    AttributeInfo(
+        name="source",
+        description="文档来源",
+        type="string"
+    ),
+    AttributeInfo(
+        name="year",
+        description="文档年份",
+        type="integer"
+    )
+]
+
+# 创建检索器
+retriever = SelfQueryRetriever.from_llm(
+    llm=ChatOpenAI(model="gpt-4o"),
+    vectorstore=vectorstore,
+    document_contents="文档内容描述",
+    metadata_field_info=metadata_field_info
+)
+
+# 自然语言查询
+docs = retriever.invoke("2023年关于 Python 的文档")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">TimeWeightedVectorStoreRetriever</h3>
+                    <p class="api-description">时间加权检索器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.retrievers import TimeWeightedVectorStoreRetriever
+
+retriever = TimeWeightedVectorStoreRetriever(
+    vectorstore=vectorstore,
+    decay_rate=0.01,  # 衰减率
+    k=3
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 基础检索器 ==========
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+vectorstore = Chroma.from_texts(
+    texts=["文档1", "文档2", "文档3"],
+    embedding=OpenAIEmbeddings()
+)
+retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+
+docs = retriever.invoke("查询文本")
+
+# ========== 示例2: 自定义检索器 ==========
+from langchain_core.retrievers import BaseRetriever
+
+class CustomRetriever(BaseRetriever):
+    def _get_relevant_documents(self, query: str) -> List[Document]:
+        # 自定义检索逻辑
+        return [Document(page_content=f"关于 {query} 的结果")]
+
+retriever = CustomRetriever()
+docs = retriever.invoke("查询")
+
+# ========== 示例3: 与链集成 ==========
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain_core.output_parsers import StrOutputParser
+
+prompt = ChatPromptTemplate.from_template("""
+基于以下上下文回答问题:
+{context}
+
+问题: {question}
+""")
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# RAG 链
+rag_chain = (
+    {"context": retriever, "question": lambda x: x["question"]}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+result = rag_chain.invoke({"question": "什么是 LangChain？"})
+
+# ========== 示例4: 过滤检索 ==========
+retriever = vectorstore.as_retriever(
+    search_kwargs={
+        "k": 3,
+        "filter": {"source": "python_docs"}
+    }
+)
+
+# ========== 示例5: 带分数阈值的检索 ==========
+retriever = vectorstore.as_retriever(
+    search_kwargs={
+        "score_threshold": 0.8,
+        "k": 5
+    }
+)
+
+# ========== 示例6: 流式检索 ==========
+async for chunk in retriever.astream("查询"):
+    print(chunk)
+
+# ========== 示例7: 批量检索 ==========
+queries = ["查询1", "查询2", "查询3"]
+results = retriever.batch(queries)</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="vector-stores.html">Vector Stores API</a></li>
+                    <li><a href="../12-retrieval.html">教程：RAG 检索</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="vector-stores.html">← Vector Stores API</a>
+                    <a href="stores.html" class="next">Stores API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档加载 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-document-loaders">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>文档加载</h1>
+                <p class="subtitle">将各种数据源加载到 LangChain 应用中</p>
+
+                <h2>为什么需要文档加载？</h2>
+                <p>在构建 RAG（检索增强生成）应用时，我们需要将外部知识源（如 PDF 文档、Word 文件、网页等）加载到系统中。文档加载器（Document Loaders）就是 LangChain 提供的统一数据导入接口。</p>
+
+                <div class="tip" data-label="提示">
+                    你可以把文档加载器想象成一个"万能翻译器"——无论原始数据是什么格式，Loader 都能将其转换为 LangChain 统一的 <code>Document</code> 对象格式。
+                </div>
+
+                <h2>Document 对象结构</h2>
+                <p>所有加载器都会返回 <code>Document</code> 对象，它包含两个核心属性：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.documents import Document
+
+# Document 对象的基本结构
+doc = Document(
+    page_content="这是文档的实际文本内容...",
+    metadata={
+        "source": "example.pdf",      # 来源文件
+        "page": 1,                      # 页码
+        "author": "张三",                # 作者
+        "date": "2024-01-01"            # 日期
+    }
+)
+
+print(doc.page_content)  # 访问文本内容
+print(doc.metadata)      # 访问元数据</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    <code>metadata</code> 字段非常强大——它可以在检索时用于过滤，比如"只搜索2024年的文档"或"只搜索某个作者的文档"。
+                </div>
+
+                <h2>文档加载流程</h2>
+                <pre class="mermaid">graph LR
+    A[数据源] --> B[选择 Loader]
+    B --> C[加载数据]
+    C --> D[Document 对象]
+    D --> E[文本分割]
+    E --> F[向量化]
+    F --> G[向量存储]
+
+    style A fill:#e1f5fe
+    style D fill:#c8e6c9
+    style G fill:#fff9c4</code></pre>
+
+                <h2>常用文档加载器</h2>
+
+                <h3>1. 文本文件加载器</h3>
+                <p>最基础的加载器，支持 .txt、.md 等纯文本文件：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import TextLoader
+
+# 加载单个文件
+loader = TextLoader("path/to/document.txt")
+documents = loader.load()
+
+print(f"加载了 {len(documents)} 个文档")
+print(f"内容预览: {documents[0].page_content[:100]}")
+
+# 加载多个文件
+from langchain_community.document_loaders import DirectoryLoader
+
+# 加载整个目录下的所有 .txt 文件
+loader = DirectoryLoader(
+    "./data",
+    glob="**/*.txt",
+    loader_cls=TextLoader
+)
+documents = loader.load()</code></pre>
+                </div>
+
+                <h3>2. PDF 文档加载器</h3>
+                <p>PDF 是最常见的文档格式，LangChain 提供多种 PDF 加载器：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import PyPDFLoader
+
+# PyPDFLoader - 提取文本和元数据
+loader = PyPDFLoader("example.pdf")
+documents = loader.load()
+
+# 每个 PDF 页面会成为一个 Document
+for doc in documents:
+    print(f"页码: {doc.metadata['page']}")
+    print(f"内容: {doc.page_content[:100]}")
+
+# 使用 pypdf 直接加载（支持更多功能）
+loader = PyPDFLoader("example.pdf", extract_images=False)
+pages = loader.load_and_split()</code></pre>
+                </div>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>PDF 加载器</th>
+                        <th>特点</th>
+                        <th>适用场景</th>
+                    </tr>
+                    <tr>
+                        <td><code>PyPDFLoader</code></td>
+                        <td>提取文本 + 页码元数据</td>
+                        <td>大多数 PDF 文档</td>
+                    </tr>
+                    <tr>
+                        <td><code>PDFMinerLoader</code></td>
+                        <td>更精确的文本提取</td>
+                        <td>复杂布局的 PDF</td>
+                    </tr>
+                    <tr>
+                        <td><code>PDFPlumberLoader</code></td>
+                        <td>保留表格结构</td>
+                        <td>包含表格的 PDF</td>
+                    </tr>
+                    <tr>
+                        <td><code>UnstructuredPDFLoader</code></td>
+                        <td>AI 驱动的布局分析</td>
+                        <td>复杂格式文档</td>
+                    </tr>
+                </table>
+
+                <h3>3. Word 文档加载器</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import Docx2txtLoader
+
+# 加载 Word 文档 (.docx)
+loader = Docx2txtLoader("document.docx")
+documents = loader.load()
+
+# 支持 .doc (旧格式)
+from langchain_community.document_loaders import UnstructuredWordDocumentLoader
+loader = UnstructuredWordDocumentLoader("old.doc", mode="elements")</code></pre>
+                </div>
+
+                <h3>4. 网页加载器</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import WebBaseLoader
+
+# 加载单个网页
+loader = WebBaseLoader("https://example.com/article")
+documents = loader.load()
+
+# 加载多个网页
+loader = WebBaseLoader([
+    "https://example.com/page1",
+    "https://example.com/page2",
+    "https://example.com/page3"
+])
+documents = loader.load()
+
+# 使用 BeautifulSoup 自定义解析
+from bs4 import BeautifulSoup
+
+loader = WebBaseLoader(
+    "https://example.com",
+    bs_kwargs=dict(
+        parse_only=bs4.SoupStrainer(class_="main-content")
+    )
+)</code></pre>
+                </div>
+
+                <div class="warning" data-label="警告">
+                    网页加载可能会遇到反爬虫机制。生产环境中建议设置请求头、使用代理、或添加延迟。
+                </div>
+
+                <h3>5. GitHub 仓库加载器</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import GitHubLoader
+
+# 加载 GitHub 仓库中的文件
+loader = GitHubLoader(
+    repo="langchain-ai/langchain",  # 仓库
+    branch="main",                   # 分支
+    github_api_url="https://api.github.com",
+    file_filter=lambda file_path: file_path.endswith(".py")  # 只加载 .py 文件
+)
+
+documents = loader.load()
+print(f"加载了 {len(documents)} 个 Python 文件")</code></pre>
+                </div>
+
+                <h3>6. 数据库加载器</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import SQLDatabaseLoader
+
+# 从数据库加载数据
+loader = SQLDatabaseLoader(
+    query="SELECT * FROM articles WHERE category = 'AI'",
+    db_uri="postgresql://user:password@localhost/dbname"
+)
+
+documents = loader.load()
+
+# 使用 SQLAlchemy 引擎
+from sqlalchemy import create_engine
+engine = create_engine("sqlite:///example.db")
+loader = SQLDatabaseLoader(
+    query="SELECT title, content FROM posts",
+    engine=engine
+)</code></pre>
+                </div>
+
+                <h3>7. Notion 加载器</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import NotionDirectoryLoader
+
+# 从 Notion 导出的 HTML 文件加载
+loader = NotionDirectoryLoader("notion-export/")
+documents = loader.load()
+
+# NotionDBLoader - 通过 API 直接访问
+from langchain_community.document_loaders import NotionDBLoader
+
+loader = NotionDBLoader(
+    integration_token="your-token",
+    database_id="database-id"
+)</code></pre>
+                </div>
+
+                <h2>Loader 类型选择决策树</h2>
+                <pre class="mermaid">graph TD
+    A[数据源类型?] --> B[本地文件]
+    A --> C[网页]
+    A --> D[数据库]
+    A --> E[云服务]
+
+    B --> B1{文件格式?}
+    B1 -->|PDF| B2[PyPDFLoader]
+    B1 -->|Word| B3[Docx2txtLoader]
+    B1 -->|文本| B4[TextLoader]
+
+    C --> C1[WebBaseLoader]
+
+    D --> D1{数据库类型?}
+    D1 -->|SQL| D2[SQLDatabaseLoader]
+
+    E --> E1{服务类型?}
+    E1 -->|GitHub| E2[GitHubLoader]
+    E1 -->|Notion| E3[NotionDirectoryLoader]
+    E1 -->|Google Drive| E4[GDriveLoader]
+
+    style B2 fill:#ffcdd2
+    style B3 fill:#ffcdd2
+    style B4 fill:#ffcdd2
+    style C1 fill:#c8e6c9
+    style D2 fill:#fff9c4
+    style E2 fill:#e1bee7
+    style E3 fill:#e1bee7</code></pre>
+
+                <h2>批量加载和异步处理</h2>
+
+                <h3>批量加载多个文件</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import TextLoader
+
+# 方式1：加载整个目录
+loader = DirectoryLoader(
+    "./documents",
+    glob="**/*.pdf",
+    loader_cls=PyPDFLoader,
+    show_progress=True,  # 显示进度条
+    use_multithreading=True  # 多线程加载
+)
+documents = loader.load()
+
+# 方式2：使用 Pathlib 灵活匹配
+from pathlib import Path
+
+loader = DirectoryLoader(
+    "./documents",
+    glob="**/*.txt",
+    loader_cls=TextLoader,
+    recursive=True,  # 递归子目录
+    show_progress=True
+)</code></pre>
+                </div>
+
+                <h3>异步加载（提高性能）</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.document_loaders import aWebBaseLoader
+import asyncio
+
+# 异步加载多个网页
+async def load_multiple_urls():
+    urls = [
+        "https://example.com/page1",
+        "https://example.com/page2",
+        "https://example.com/page3"
+    ]
+
+    loader = aWebBaseLoader(urls)
+    documents = await loader.aload()
+
+    return documents
+
+# 运行
+documents = asyncio.run(load_multiple_urls())</code></pre>
+                </div>
+
+                <div class="tip" data-label="性能提示">
+                    加载大量文件时，使用 <code>use_multithreading=True</code> 或异步加载器可以将速度提升 3-5 倍。
+                </div>
+
+                <h2>自定义文档加载器</h2>
+                <p>当内置加载器无法满足需求时，你可以创建自定义加载器：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.document_loaders import BaseLoader
+from langchain_core.documents import Document
+from typing import List
+
+class CustomLoader(BaseLoader):
+    """自定义文档加载器基类"""
+
+    def __init__(self, source: str):
+        self.source = source
+
+    def load(self) -> List[Document]:
+        """同步加载方法"""
+        # 实现你的加载逻辑
+        with open(self.source, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        return [
+            Document(
+                page_content=content,
+                metadata={"source": self.source}
+            )
+        ]
+
+# 示例：加载特定格式日志文件
+class LogLoader(BaseLoader):
+    """加载应用日志文件"""
+
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+    def load(self) -> List[Document]:
+        documents = []
+
+        with open(self.file_path, 'r') as f:
+            for line_num, line in enumerate(f, 1):
+                # 每行作为一个文档
+                if line.strip():
+                    documents.append(Document(
+                        page_content=line.strip(),
+                        metadata={
+                            "source": self.file_path,
+                            "line_number": line_num
+                        }
+                    ))
+
+        return documents
+
+# 使用自定义加载器
+loader = LogLoader("application.log")
+documents = loader.load()</code></pre>
+                </div>
+
+                <h2>加载后处理</h2>
+
+                <h3>添加额外元数据</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from datetime import datetime
+
+# 加载文档
+loader = TextLoader("document.txt")
+documents = loader.load()
+
+# 为每个文档添加额外元数据
+for doc in documents:
+    doc.metadata.update({
+        "loaded_at": datetime.now().isoformat(),
+        "category": "技术文档",
+        "language": "zh-CN",
+        "tags": ["langchain", "教程"]
+    })</code></pre>
+                </div>
+
+                <h3>内容清洗</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import re
+
+def clean_document(doc: Document) -> Document:
+    """清洗文档内容"""
+    # 移除多余空白
+    content = re.sub(r'\s+', ' ', doc.page_content)
+
+    # 移除特殊字符
+    content = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', content)
+
+    # 更新内容
+    doc.page_content = content.strip()
+    return doc
+
+# 批量清洗
+documents = [clean_document(doc) for doc in documents]</code></pre>
+                </div>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 选择合适的加载器</h3>
+                    <ul>
+                        <li>PDF 首选 <code>PyPDFLoader</code>，复杂布局使用 <code>UnstructuredPDFLoader</code></li>
+                        <li>Word 文档使用 <code>Docx2txtLoader</code></li>
+                        <li>网页内容使用 <code>WebBaseLoader</code> 并配合 BeautifulSoup 过滤</li>
+                    </ul>
+
+                    <h3>2. 保留有价值的元数据</h3>
+                    <ul>
+                        <li>页码、章节、作者等信息对检索很重要</li>
+                        <li>自定义标签可以在后续过滤中使用</li>
+                    </ul>
+
+                    <h3>3. 处理加载失败</h3>
+                    <ul>
+                        <li>使用 try-except 包裹加载操作</li>
+                        <li>记录加载失败的文件以便重试</li>
+                        <li>对损坏的文件有降级处理方案</li>
+                    </ul>
+
+                    <h3>4. 性能优化</h3>
+                    <ul>
+                        <li>大量文件使用多线程或异步加载</li>
+                        <li>考虑缓存已加载的文档</li>
+                        <li>对超大文件考虑分块加载</li>
+                    </ul>
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 以下哪种加载器最适合处理包含复杂表格的 PDF 文档？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. PyPDFLoader</div>
+                            <div class="option correct-option">B. PDFPlumberLoader</div>
+                            <div class="option">C. TextLoader</div>
+                            <div class="option">D. WebBaseLoader</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. Document 对象的哪个属性用于存储文档来源、页码等信息？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. page_content</div>
+                            <div class="option correct-option">B. metadata</div>
+                            <div class="option">C. source</div>
+                            <div class="option">D. content</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            3. 补全代码：使用 DirectoryLoader 加载目录下所有 PDF 文件
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
+
+loader = DirectoryLoader(
+    "./documents",
+    glob="____",
+    loader_cls=____,
+    show_progress=True
+)
+documents = loader.load()</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            4. 创建一个自定义加载器，加载 CSV 文件并将每一行转换为一个 Document 对象
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            5. 你需要加载一个包含 1000 个 PDF 文件的目录，每个文件约 10MB。如何设计加载流程以提高效率？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="06-agents.html">← 上一章：智能体</a>
+                    <a href="08-text-splitters.html" class="next">下一章：文本分割 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

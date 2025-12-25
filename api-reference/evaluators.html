@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评估器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-evaluators">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>评估器 API</h1>
+                <p class="subtitle">评估框架与质量指标</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#string" class="api-nav-link">字符串评估器</a>
+                    <a href="#load" class="api-nav-link">加载评估器</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>评估器用于量化 LLM 应用的输出质量，支持正确性、相关性、连贯性等多维度评估。</p>
+
+                <pre class="mermaid">graph TD
+    A[Evaluators] --> B[StringEvaluator]
+    A --> C[PairwiseStringEvaluator]
+    A --> D[EmbeddingEvaluator]
+
+    B --> E[准确率]
+    B --> F[相关性]
+
+    C --> G[成对比较]
+
+    D --> H[语义相似度]
+
+    A --> I[load_evaluator]
+    I --> J[labeled_criteria]
+    I --> K[criteria]
+    I --> L[labeled_pairwise_string]
+
+    style A fill:#e1f5fe
+    style I fill:#c8e6c9</code></pre>
+
+                <h2 id="string">字符串评估器</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">StringEvaluator</h3>
+                    <p class="api-description">字符串评估器基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import StringEvaluator
+
+class StringEvaluator(ABC):
+    """字符串评估器基类"""
+
+    @property
+    @abstractmethod
+    def evaluation_name(self) -> str:
+        """返回评估器名称"""
+
+    @abstractmethod
+    def evaluate_strings(
+        self,
+        *,
+        prediction: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None,
+        **kwargs: Any,
+    ) -> dict:
+        """
+        评估字符串输出
+
+        Args:
+            prediction: 模型预测输出
+            reference: 参考答案（可选）
+            input: 输入（可选）
+            **kwargs: 额外参数
+
+        Returns:
+            评估结果字典，通常包含:
+            - score: 分数（0-1 或其他范围）
+            - reasoning: 评估理由
+            - 其他自定义字段
+        """
+
+    async def aevaluate_strings(
+        self,
+        prediction: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None,
+        **kwargs: Any,
+    ) -> dict:
+        """异步评估"""
+
+    def evaluate_strings_optimized(
+        self,
+        prediction: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None,
+    ) -> dict:
+        """优化版评估（批量处理）"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">PairwiseStringEvaluator</h3>
+                    <p class="api-description">成对比较评估器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import PairwiseStringEvaluator
+
+class PairwiseStringEvaluator(ABC):
+    """成对字符串评估器"""
+
+    @abstractmethod
+    def evaluate_string_pairs(
+        self,
+        *,
+        prediction: str,
+        prediction_b: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None,
+        **kwargs: Any,
+    ) -> dict:
+        """
+        评估两个输出
+
+        Args:
+            prediction: 输出 A
+            prediction_b: 输出 B
+            reference: 参考答案（可选）
+            input: 输入（可选）
+
+        Returns:
+            评估结果:
+            - score: 0 (A更好), 1 (B更好), 或 None (平局)
+            - reasoning: 评估理由
+        """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="load">加载评估器</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">load_evaluator</h3>
+                    <p class="api-description">加载内置评估器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+def load_evaluator(
+    evaluator: Union[
+        EvaluatorsKeys,
+        str,
+    ],
+    *,
+    llm: Optional[BaseLanguageModel] = None,
+    client: Optional[Client] = None,
+    **kwargs: Any,
+) -> Union[StringEvaluator, PairwiseStringEvaluator]:
+    """
+    加载评估器
+
+    Args:
+        evaluator: 评估器标识
+            - "criteria": 自定义标准评估
+            - "labeled_criteria": 带标签的标准评估
+            - "labeled_pairwise_string": 成对比较评估
+            - "embedding_distance": 嵌入距离评估
+            - "string_distance": 字符串距离评估
+        llm: 用于评估的 LLM
+        client: LangSmith 客户端
+        **kwargs: 额外参数
+
+    Returns:
+        评估器实例
+    """</code></pre>
+                    </div>
+
+                    <h4>可用评估器</h4>
+                    <table class="api-table">
+                        <tr>
+                            <th>evaluator</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>criteria</td>
+                            <td>自定义标准</td>
+                        </tr>
+                        <tr>
+                            <td>labeled_criteria</td>
+                            <td>带标签的标准</td>
+                        </tr>
+                        <tr>
+                            <td>labeled_pairwise_string</td>
+                            <td>成对比较</td>
+                        </tr>
+                        <tr>
+                            <td>embedding_distance</td>
+                            <td>嵌入距离</td>
+                        </tr>
+                        <tr>
+                            <td>string_distance</td>
+                            <td>字符串距离</td>
+                        </tr>
+                        <tr>
+                            <td>qa</td>
+                            <td>QA 评估</td>
+                        </tr>
+                        <tr>
+                            <td>cot_qa</td>
+                            <td>思维链 QA</td>
+                        </tr>
+                    </table>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# 加载标准评估器
+evaluator = load_evaluator(
+    "labeled_criteria",
+    criteria="correctness",
+    llm=llm
+)
+
+result = evaluator.evaluate_strings(
+    prediction="巴黎是法国的首都",
+    reference="巴黎是法国的首都",
+    input="法国的首都是哪里？"
+)
+
+print(f"分数: {result['score']}")
+print(f"理由: {result['reasoning']}")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">自定义标准评估</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+# 自定义标准
+custom_criteria = {
+    "helpfulness": "输出是否对用户有帮助？",
+    "clarity": "输出是否清晰明了？",
+    "accuracy": "输出是否准确无误？",
+    "relevance": "输出是否与输入相关？"
+}
+
+evaluator = load_evaluator(
+    "criteria",
+    criteria=custom_criteria,
+    llm=ChatOpenAI(model="gpt-4o")
+)
+
+result = evaluator.evaluate_strings(
+    prediction="Python 是一种高级编程语言...",
+    input="什么是 Python？"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">成对比较评估</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+
+evaluator = load_evaluator(
+    "labeled_pairwise_string",
+    criteria="helpfulness",
+    llm=ChatOpenAI(model="gpt-4o")
+)
+
+result = evaluator.evaluate_string_pairs(
+    prediction="Python 是一种语言",
+    prediction_b="Python 是一种由 Guido van Rossum 创建的高级编程语言",
+    input="Python 是什么？",
+    reference="Python 是一种编程语言"
+)
+
+print(f"胜出: {result['score']}")  # A 或 B
+print(f"理由: {result['reasoning']}")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">嵌入距离评估</h3>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.evaluators import load_evaluator
+from langchain_openai import OpenAIEmbeddings
+
+evaluator = load_evaluator(
+    "embedding_distance",
+    distance_metric="cosine",  # cosine, euclidean, manhattan
+    embeddings=OpenAIEmbeddings()
+)
+
+result = evaluator.evaluate_strings(
+    prediction="相似的内容",
+    reference="相似的内容"
+)
+
+print(f"距离分数: {result['score']}")  # 距离越小分数越高</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 自定义评估器 ==========
+from langchain_core.evaluators import StringEvaluator
+from typing import Optional
+
+class ExactMatchEvaluator(StringEvaluator):
+    """精确匹配评估器"""
+
+    @property
+    def evaluation_name(self) -> str:
+        return "exact_match"
+
+    def evaluate_strings(
+        self,
+        *,
+        prediction: str,
+        reference: Optional[str] = None,
+        input: Optional[str] = None,
+    ) -> dict:
+        score = 1 if prediction.strip() == reference.strip() else 0
+        return {
+            "score": score,
+            "reasoning": f"预测: {prediction} | 参考: {reference}"
+        }
+
+evaluator = ExactMatchEvaluator()
+result = evaluator.evaluate_strings(
+    prediction="Hello World",
+    reference="Hello World"
+)
+# {"score": 1, "reasoning": "..."}
+
+# ========== 示例2: 批量评估 ==========
+test_cases = [
+    {"input": "2+2=?", "reference": "4"},
+    {"input": "法国首都?", "reference": "巴黎"},
+    {"input": "Python?", "reference": "编程语言"}
+]
+
+for case in test_cases:
+    prediction = llm.invoke(case["input"])
+    result = evaluator.evaluate_strings(
+        prediction=prediction.content,
+        reference=case["reference"],
+        input=case["input"]
+    )
+    print(f"输入: {case['input']}, 分数: {result['score']}")
+
+# ========== 示例3: 评估链 ==========
+from langchain_core.runnables import RunnableLambda
+from langchain_core.prompts import ChatPromptTemplate
+
+# 创建评估链
+eval_prompt = ChatPromptTemplate.from_template("""
+评估以下回答的质量:
+
+问题: {input}
+回答: {prediction}
+
+请评分 (0-1): {grading_prompt}
+""")
+
+eval_chain = eval_prompt | llm | StrOutputParser()
+
+# ========== 示例4: RAG 评估 (RAGAS) ==========
+from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_recall,
+    context_precision
+)
+
+test_data = {
+    "question": ["什么是 LangChain？"],
+    "answer": ["LangChain 是一个框架"],
+    "contexts": [["LangChain 是..."]],  # 检索到的上下文
+    "ground_truth": ["LangChain 是 LLM 应用框架"]
+}
+
+result = evaluate(
+    test_data,
+    metrics=[faithfulness, answer_relevancy, context_recall, context_precision]
+)
+
+print(result.to_pandas())
+
+# ========== 示例5: A/B 测试评估 ==========
+evaluator = load_evaluator("labeled_pairwise_string", llm=llm)
+
+# 两个版本
+results_v1 = chain_v1.batch(inputs)
+results_v2 = chain_v2.batch(inputs)
+
+for i, (r1, r2) in enumerate(zip(results_v1, results_v2)):
+    comparison = evaluator.evaluate_string_pairs(
+        prediction=r1.content,
+        prediction_b=r2.content,
+        input=inputs[i]
+    )
+    print(f"输入 {i}: {comparison['score']} (A更好=0, B更好=1)")</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="tracers.html">Tracers API</a></li>
+                    <li><a href="../16-evaluation.html">教程：评估框架</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="tracers.html">← Tracers API</a>
+                    <a href="langgraph.html" class="next">LangGraph API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

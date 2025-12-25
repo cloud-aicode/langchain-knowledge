@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆管理 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-memory">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>记忆管理 API</h1>
+                <p class="subtitle">Memory 与对话历史</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#legacy" class="api-nav-link">传统 Memory</a>
+                    <a href="#new" class="api-nav-link">新式 RunnableWithMessageHistory</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>记忆管理用于在对话中保持上下文。LangChain 提供了传统 Memory 类和新的 RunnableWithMessageHistory 包装器。</p>
+
+                <pre class="mermaid">graph TD
+                    A[Memory] --> B[ConversationBufferMemory]
+                    A --> C[ConversationSummaryMemory]
+                    A --> D[ConversationBufferWindowMemory]
+                    A --> E[ConversationKGMemory]
+                    A --> F[ConversationSummaryBufferMemory]
+
+    G[RunnableWithMessageHistory] --> H[新式记忆]
+    H --> I[get_session_history]
+
+    style A fill:#e1f5fe
+    style G fill:#c8e6c9</code></pre>
+
+                <h2 id="legacy">传统 Memory 类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">BaseMemory</h3>
+                    <p class="api-description">传统 Memory 基类（已弃用）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.memory import BaseMemory
+
+class BaseMemory(Serializable, ABC):
+    """Memory 基类"""
+
+    @property
+    @abstractmethod
+    def memory_variables(self) -> List[str]:
+        """返回内存变量名列表"""
+
+    @abstractmethod
+    def load_memory_variables(
+        self,
+        inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        加载内存变量
+
+        Args:
+            inputs: 当前输入
+
+        Returns:
+            内存变量字典
+        """
+
+    @abstractmethod
+    def save_context(
+        self,
+        inputs: Dict[str, Any],
+        outputs: Dict[str, Any],
+    ) -> None:
+        """
+        保存上下文
+
+        Args:
+            inputs: 输入
+            outputs: 输出
+        """
+
+    def clear(self) -> None:
+        """清空内存"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ConversationBufferMemory</h3>
+                    <p class="api-description">缓冲所有对话历史。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.memory import ConversationBufferMemory
+
+class ConversationBufferMemory(BaseMemory):
+    """对话缓冲内存"""
+
+    human_prefix: str = "Human"
+    """用户消息前缀"""
+
+    ai_prefix: str = "AI"
+    """AI 消息前缀"""
+
+    return_messages: bool = False
+    """是否返回消息对象而非字符串"""
+
+    input_key: str = "input"
+    output_key: str = "output"
+
+    def __init__(
+        self,
+        return_messages: bool = False,
+        human_prefix: str = "Human",
+        ai_prefix: str = "AI",
+        chat_memory: Optional[BaseChatMessageHistory] = None,
+    ):
+        """
+        初始化
+
+        Args:
+            return_messages: 是否返回消息对象
+            human_prefix: 用户前缀
+            ai_prefix: AI 前缀
+            chat_memory: 聊天历史存储
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.memory import ConversationBufferMemory
+from langchain_openai import OpenAI
+
+# 创建 Memory
+memory = ConversationBufferMemory(
+    return_messages=True,
+    human_prefix="User",
+    ai_prefix="Assistant"
+)
+
+# 保存上下文
+memory.save_context(
+    inputs={"input": "你好"},
+    outputs={"output": "你好！有什么可以帮助你的？"}
+)
+
+# 加载内存
+memory_variables = memory.load_memory_variables({})
+print(memory_variables["history"])
+
+# 查看消息
+for msg in memory.chat_memory.messages:
+    print(f"{msg.type}: {msg.content}")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ConversationSummaryMemory</h3>
+                    <p class="api-description">总结对话历史。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.memory import ConversationSummaryMemory
+
+class ConversationSummaryMemory(BaseMemory):
+    """对话总结内存"""
+
+    llm: BaseLanguageModel
+    """用于生成总结的 LLM"""
+
+    prompt: BasePromptTemplate = DEFAULT_SUMMARY_PROMPT
+    """总结提示模板"""
+
+    summary: str = ""
+    """当前总结"""
+
+    def __init__(
+        self,
+        llm: BaseLanguageModel,
+        prompt: Optional[BasePromptTemplate] = None,
+        return_messages: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            llm: 语言模型
+            prompt: 总结提示
+            return_messages: 是否返回消息对象
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.memory import ConversationSummaryMemory
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+memory = ConversationSummaryMemory(
+    llm=llm,
+    return_messages=False
+)
+
+# 保存对话（自动总结）
+memory.save_context(
+    inputs={"input": "我是 Alice"},
+    outputs={"output": "你好 Alice！"}
+)
+
+memory.save_context(
+    inputs={"input": "我喜欢编程"},
+    outputs={"output": "那很棒！"}
+)
+
+# 获取总结
+summary = memory.load_memory_variables({})["summary"]
+print(summary)
+# "Alice 介绍了自己，并表示喜欢编程。"</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ConversationBufferWindowMemory</h3>
+                    <p class="api-description">只保留最近 k 轮对话。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.memory import ConversationBufferWindowMemory
+
+class ConversationBufferWindowMemory(BaseMemory):
+    """窗口缓冲内存"""
+
+    k: int = 5
+    """保留的轮数"""
+
+    memory_key: str = "history"
+
+    def __init__(
+        self,
+        k: int = 5,
+        return_messages: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            k: 保留的对话轮数
+            return_messages: 是否返回消息对象
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.memory import ConversationBufferWindowMemory
+
+memory = ConversationBufferWindowMemory(
+    k=2,  # 只保留最近 2 轮
+    return_messages=True
+)
+
+# 添加多轮对话
+for i in range(5):
+    memory.save_context(
+        inputs={"input": f"消息 {i*2+1}"},
+        outputs={"output": f"回复 {i*2+2}"}
+    )
+
+# 只保留最近 2 轮
+history = memory.load_memory_variables({})["history"]
+print(f"消息数: {len(history)}")  # 4 (2轮 x 2条)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ConversationSummaryBufferMemory</h3>
+                    <p class="api-description">结合总结和缓冲的内存。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain.memory import ConversationSummaryBufferMemory
+
+class ConversationSummaryBufferMemory(BaseMemory):
+    """总结缓冲内存"""
+
+    max_token_limit: int = 2000
+    """最大 token 数"""
+
+    llm: BaseLanguageModel
+
+    def __init__(
+        self,
+        llm: BaseLanguageModel,
+        max_token_limit: int = 2000,
+        return_messages: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            llm: 语言模型
+            max_token_limit: 最大 token 数
+            return_messages: 是否返回消息对象
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain.memory import ConversationSummaryBufferMemory
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+memory = ConversationSummaryBufferMemory(
+    llm=llm,
+    max_token_limit=100,
+    return_messages=True
+)
+
+# 添加对话（超过限制会自动总结）
+memory.save_context(
+    inputs={"input": "长对话内容..."},
+    outputs={"output": "长回复内容..."}
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="new">新式 RunnableWithMessageHistory</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">RunnableWithMessageHistory</h3>
+                    <p class="api-description">推荐的新式记忆管理方式。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.runnables.history import RunnableWithMessageHistory
+
+class RunnableWithMessageHistory(Runnable[Input, Output]):
+    """带消息历史的 Runnable"""
+
+    runnable: Runnable[Input, Output]
+    """底层 Runnable"""
+
+    get_session_history: Callable[[str], BaseChatMessageHistory]
+    """获取历史记录的函数"""
+
+    input_messages_key: str = "input"
+    """输入消息在输入中的键名"""
+
+    history_messages_key: str = "history"
+    """历史消息在输入中的键名"""
+
+    def __init__(
+        self,
+        runnable: Runnable[Input, Output],
+        get_session_history: Callable[[str], BaseChatMessageHistory],
+        *,
+        input_messages_key: str = "input",
+        history_messages_key: str = "history",
+    ):
+        """
+        初始化
+
+        Args:
+            runnable: 底层 Runnable（如 prompt | llm）
+            get_session_history: 获取历史的函数
+                接收 session_id，返回 BaseChatMessageHistory
+            input_messages_key: 输入消息的键名
+            history_messages_key: 历史消息的键名
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain_core.chat_history import InMemoryChatMessageHistory
+
+# 创建基础链
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("placeholder", "{history}"),
+    ("user", "{input}")
+])
+
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 创建历史存储
+store = {}
+
+def get_session_history(session_id: str):
+    if session_id not in store:
+        store[session_id] = InMemoryChatMessageHistory()
+    return store[session_id]
+
+# 包装链
+with_history = RunnableWithMessageHistory(
+    runnable=chain,
+    get_session_history=get_session_history,
+    input_messages_key="input",
+    history_messages_key="history"
+)
+
+# 使用（通过 config 传递 session_id）
+result = with_history.invoke(
+    {"input": "你好！"},
+    config={"configurable": {"session_id": "user_123"}}
+)
+
+# 第二轮对话（会包含历史）
+result = with_history.invoke(
+    {"input": "我刚才问了什么？"},
+    config={"configurable": {"session_id": "user_123"}}
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python"># ========== 示例1: 使用 ConversationBufferMemory ==========
+from langchain.memory import ConversationBufferMemory
+from langchain_openai import OpenAI
+from langchain.chains import ConversationChain
+
+llm = OpenAI(temperature=0)
+memory = ConversationBufferMemory()
+
+conversation = ConversationChain(
+    llm=llm,
+    memory=memory,
+    verbose=True
+)
+
+# 第一轮
+response = conversation.predict(input="你好，我是 Alice")
+# 第二轮（包含历史）
+response = conversation.predict(input="我叫什么名字？")
+
+# ========== 示例2: 使用 RunnableWithMessageHistory（推荐）==========
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain_core.chat_history import InMemoryChatMessageHistory
+
+# 历史存储
+chat_histories = {}
+
+def get_history(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in chat_histories:
+        chat_histories[session_id] = InMemoryChatMessageHistory()
+    return chat_histories[session_id]
+
+# 创建链
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("placeholder", "{history}"),
+    ("user", "{input}")
+])
+
+chain = prompt | ChatOpenAI(model="gpt-4o")
+
+# 包装
+with_history = RunnableWithMessageHistory(
+    chain,
+    get_history,
+    input_messages_key="input",
+    history_messages_key="history"
+)
+
+# 多用户支持
+response1 = with_history.invoke(
+    {"input": "你好，我是 Bob"},
+    config={"configurable": {"session_id": "user_1"}}
+)
+
+response2 = with_history.invoke(
+    {"input": "你好，我是 Carol"},
+    config={"configurable": {"session_id": "user_2"}}
+)
+
+# 每个 session 独立
+response3 = with_history.invoke(
+    {"input": "我叫什么名字？"},
+    config={"configurable": {"session_id": "user_1"}}
+)  # 返回 Bob</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="stores.html">Stores API</a></li>
+                    <li><a href="checkpointers.html">Checkpointers API</a></li>
+                    <li><a href="../10-memory.html">教程：记忆管理</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="stores.html">← Stores API</a>
+                    <a href="checkpointers.html" class="next">Checkpointers API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

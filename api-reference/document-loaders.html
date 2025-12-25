@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档加载器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-document-loaders">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>文档加载器 API</h1>
+                <p class="subtitle">BaseLoader 与文档加载</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#loaders" class="api-nav-link">常用加载器</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>文档加载器负责从各种数据源加载文档内容，转换为 LangChain 可使用的 Document 对象。</p>
+
+                <pre class="mermaid">graph TD
+                    A[BaseLoader] --> B[TextLoader]
+                    A --> C[PyPDFLoader]
+                    A --> D[WebBaseLoader]
+                    A --> E[DirectoryLoader]
+                    A --> F[JSONLoader]
+
+                    B --> G[Document]
+                    C --> G
+                    D --> G
+                    E --> G
+                    F --> G
+
+                    style A fill:#e1f5fe
+                    style G fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">BaseLoader</h3>
+                    <p class="api-description">所有文档加载器的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.document_loaders import BaseLoader
+
+class BaseLoader(ABC):
+    """文档加载器基类"""
+
+    @abstractmethod
+    def load(self) -> List[Document]:
+        """
+        加载文档
+
+        Returns:
+            Document 对象列表
+        """
+
+    def load_and_split(
+        self,
+        text_splitter: Optional[TextSplitter] = None,
+    ) -> List[Document]:
+        """
+        加载并分割文档
+
+        Args:
+            text_splitter: 文本分割器
+
+        Returns:
+            分割后的 Document 列表
+        """
+
+    async def aload(self) -> List[Document]:
+        """异步加载文档"""
+        return await asyncio.to_thread(self.load)
+
+    def lazy_load(self) -> Iterator[Document]:
+        """
+        懒加载文档
+
+        Yields:
+            Document 对象
+        """
+
+    async def alazy_load(self) -> AsyncIterator[Document]:
+        """
+        异步懒加载
+
+        Yields:
+            Document 对象
+        """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">Document</h3>
+                    <p class="api-description">文档对象。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.documents import Document
+
+class Document(Serializable):
+    """文档对象"""
+
+    page_content: str
+    """文档内容"""
+
+    metadata: Dict[str, Any] = {}
+    """元数据字典"""
+
+    type: Literal["Document"] = "Document"
+    """类型标识"""
+
+    def __init__(
+        self,
+        page_content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ):
+        """
+        初始化文档
+
+        Args:
+            page_content: 文档内容
+            metadata: 元数据
+            **kwargs: 额外参数
+        """
+
+    def to_json(self) -> str:
+        """转换为 JSON"""
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "Document":
+        """从 JSON 创建文档"""</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="loaders">常用加载器</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">TextLoader</h3>
+                    <p class="api-description">加载文本文件。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_loaders import TextLoader
+
+class TextLoader(BaseLoader):
+    """文本文件加载器"""
+
+    def __init__(
+        self,
+        file_path: str,
+        encoding: Optional[str] = None,
+        autodetect_encoding: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            file_path: 文件路径
+            encoding: 文件编码
+            autodetect_encoding: 是否自动检测编码
+        """
+
+    def load(self) -> List[Document]:
+        """加载文本文件"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import TextLoader
+
+# 加载单个文件
+loader = TextLoader("example.txt")
+documents = loader.load()
+
+# 自动检测编码
+loader = TextLoader("example.txt", autodetect_encoding=True)
+
+# 指定编码
+loader = TextLoader("example.txt", encoding="utf-8")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">PyPDFLoader</h3>
+                    <p class="api-description">加载 PDF 文件。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_loaders import PyPDFLoader
+
+class PyPDFLoader(BaseLoader):
+    """PDF 文件加载器"""
+
+    def __init__(
+        self,
+        file_path: str,
+        password: Optional[str] = None,
+        extract_images: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            file_path: PDF 文件路径
+            password: PDF 密码（如有）
+            extract_images: 是否提取图片
+        """
+
+    def load(self) -> List[Document]:
+        """加载 PDF（每页一个 Document）"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import PyPDFLoader
+
+# 基础使用
+loader = PyPDFLoader("document.pdf")
+pages = loader.load()
+
+# 带密码
+loader = PyPDFLoader("document.pdf", password="secret")
+
+# 提取图片
+loader = PyPDFLoader("document.pdf", extract_images=True)
+
+# 查看页数
+print(f"总页数: {len(pages)}")
+print(f"第一页: {pages[0].page_content[:100]}")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">WebBaseLoader</h3>
+                    <p class="api-description">加载网页内容。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_loaders import WebBaseLoader
+
+class WebBaseLoader(BaseLoader):
+    """网页加载器"""
+
+    def __init__(
+        self,
+        web_path: Union[str, List[str]],
+        header_template: Optional[Dict[str, str]] = None,
+        verify_ssl: bool = True,
+        requests_per_second: Optional[int] = None,
+        continue_on_failure: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            web_path: URL 或 URL 列表
+            header_template: HTTP 请求头
+            verify_ssl: 是否验证 SSL
+            requests_per_second: 请求速率限制
+            continue_on_failure: 失败时是否继续
+        """
+
+    def load(self) -> List[Document]:
+        """加载网页"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import WebBaseLoader
+
+# 加载单个网页
+loader = WebBaseLoader("https://example.com")
+document = loader.load()
+
+# 加载多个网页
+urls = [
+    "https://example.com/page1",
+    "https://example.com/page2"
+]
+loader = WebBaseLoader(urls)
+documents = loader.load()
+
+# 自定义请求头
+loader = WebBaseLoader(
+    "https://example.com",
+    header_template={
+        "User-Agent": "Mozilla/5.0",
+        "Authorization": "Bearer token"
+    }
+)
+
+# 使用 BeautifulSoup 选择器
+from bs4 import SoupStrainer
+
+loader = WebBaseLoader(
+    "https://example.com",
+    bs_kwargs={
+        "parse_only": SoupStrainer(["p", "h1", "h2"])
+    }
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">DirectoryLoader</h3>
+                    <p class="api-description">加载目录下的所有文件。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_loaders import DirectoryLoader
+
+class DirectoryLoader(BaseLoader):
+    """目录加载器"""
+
+    def __init__(
+        self,
+        path: str,
+        glob: str = "**/[!.]*",
+        silent_errors: bool = False,
+        load_hidden: bool = False,
+        loader_cls: LoaderType = TextLoader,
+        loader_kwargs: Optional[Dict[str, Any]] = None,
+        recursive: bool = False,
+        show_progress: bool = False,
+        use_multithreading: bool = False,
+        max_concurrency: int = 4,
+    ):
+        """
+        初始化
+
+        Args:
+            path: 目录路径
+            glob: 文件匹配模式
+            silent_errors: 是否忽略错误
+            load_hidden: 是否加载隐藏文件
+            loader_cls: 使用的加载器类
+            loader_kwargs: 传递给加载器的参数
+            recursive: 是否递归加载
+            show_progress: 是否显示进度
+            use_multithreading: 是否使用多线程
+            max_concurrency: 最大并发数
+        """
+
+    def load(self) -> List[Document]:
+        """加载目录中的所有文件"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import DirectoryLoader, TextLoader
+
+# 加载所有文本文件
+loader = DirectoryLoader(
+    "./data",
+    glob="**/*.txt",
+    loader_cls=TextLoader
+)
+documents = loader.load()
+
+# 加载 PDF 文件
+from langchain_community.document_loaders import PyPDFLoader
+
+loader = DirectoryLoader(
+    "./documents",
+    glob="**/*.pdf",
+    loader_cls=PyPDFLoader
+)
+
+# 递归加载
+loader = DirectoryLoader(
+    "./data",
+    glob="**/*.txt",
+    recursive=True
+)
+
+# 使用多线程
+loader = DirectoryLoader(
+    "./data",
+    glob="**/*.txt",
+    use_multithreading=True,
+    max_concurrency=8,
+    show_progress=True
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">JSONLoader</h3>
+                    <p class="api-description">加载 JSON 文件。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_loaders import JSONLoader
+
+class JSONLoader(BaseLoader):
+    """JSON 文件加载器"""
+
+    def __init__(
+        self,
+        file_path: str,
+        jq_schema: Optional[str] = None,
+        content_key: Optional[str] = None,
+        metadata_func: Optional[Callable[[Dict, Dict], Dict]] = None,
+        text_content: bool = True,
+        json_lines: bool = false,
+    ):
+        """
+        初始化
+
+        Args:
+            file_path: JSON 文件路径
+            jq_schema: jq 表达式（用于选择数据）
+            content_key: 内容字段名
+            metadata_func: 元数据生成函数
+            text_content: 是否提取文本内容
+            json_lines: 是否为 JSON Lines 格式
+        """
+
+    def load(self) -> List[Document]:
+        """加载 JSON 文件"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import JSONLoader
+
+# 加载 JSON 数组
+loader = JSONLoader(
+    file_path="data.json",
+    jq_schema=".[]",  # 展开数组
+    text_content=False  # 保留 JSON 结构
+)
+
+# 提取特定字段
+loader = JSONLoader(
+    file_path="data.json",
+    jq_schema=".[] | {title, content}",
+    content_key="content"
+)
+
+# 自定义元数据
+def metadata_func(record: dict, metadata: dict) -> dict:
+    metadata["title"] = record.get("title")
+    metadata["date"] = record.get("date")
+    return metadata
+
+loader = JSONLoader(
+    file_path="data.json",
+    jq_schema=".[]",
+    metadata_func=metadata_func
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">其他常用加载器</h3>
+
+                    <h4>CSVLoader</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import CSVLoader
+
+loader = CSVLoader(
+    file_path="data.csv",
+    csv_args={
+        "delimiter": ",",
+        "quotechar": '"',
+        "fieldnames": ["col1", "col2", "col3"]
+    }
+)</code></pre>
+                    </div>
+
+                    <h4>MarkdownLoader</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import UnstructuredMarkdownLoader
+
+loader = UnstructuredMarkdownLoader("README.md")</code></pre>
+                    </div>
+
+                    <h4>YouTubeLoader</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_loaders import YoutubeLoader
+
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=xxx",
+    add_video_info=True,
+    language=["en", "zh"],
+    translation="en"
+)</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 加载文本文件 ==========
+from langchain_community.document_loaders import TextLoader
+
+loader = TextLoader("example.txt")
+docs = loader.load()
+
+print(f"内容: {docs[0].page_content}")
+print(f"元数据: {docs[0].metadata}")
+
+# ========== 示例2: 加载 PDF ==========
+from langchain_community.document_loaders import PyPDFLoader
+
+loader = PyPDFLoader("document.pdf")
+pages = loader.load()
+
+for i, page in enumerate(pages):
+    print(f"页码: {page.metadata.get('page')}")
+    print(f"内容: {page.page_content[:100]}")
+
+# ========== 示例3: 加载目录 ==========
+from langchain_community.document_loaders import DirectoryLoader
+
+loader = DirectoryLoader(
+    "./documents",
+    glob="**/*.txt",
+    show_progress=True
+)
+docs = loader.load()
+
+# ========== 示例4: 加载并分割 ==========
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+loader = TextLoader("large_document.txt")
+docs = loader.load_and_split(
+    text_splitter=RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+)
+
+# ========== 示例5: 加载网页 ==========
+from langchain_community.document_loaders import WebBaseLoader
+
+urls = [
+    "https://example.com/article1",
+    "https://example.com/article2"
+]
+loader = WebBaseLoader(urls)
+docs = loader.load()
+
+# ========== 示例6: 异步加载 ==========
+import asyncio
+
+async def load_documents():
+    loader = TextLoader("example.txt")
+    docs = await loader.aload()
+    return docs
+
+docs = asyncio.run(load_documents())
+
+# ========== 示例7: 懒加载（大文件）==========
+def process_large_file():
+    loader = TextLoader("huge_file.txt")
+    for doc in loader.lazy_load():
+        # 逐块处理
+        process_chunk(doc.page_content)
+
+# ========== 示例8: 自定义加载器 ==========
+from langchain_core.document_loaders import BaseLoader
+
+class CustomLoader(BaseLoader):
+    def __init__(self, source: str):
+        self.source = source
+
+    def load(self) -> List[Document]:
+        # 自定义加载逻辑
+        with open(self.source) as f:
+            content = f.read()
+        return [
+            Document(
+                page_content=content,
+                metadata={"source": self.source}
+            )
+        ]
+
+loader = CustomLoader("custom.dat")
+docs = loader.load()</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="text-splitters.html">Text Splitters API</a></li>
+                    <li><a href="../07-document-loaders.html">教程：文档加载</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="tools.html">← Tools API</a>
+                    <a href="text-splitters.html" class="next">Text Splitters API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图工作流 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-langgraph">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>图工作流</h1>
+                <p class="subtitle">使用 LangGraph 构建复杂的有状态应用</p>
+
+                <h2>什么是 LangGraph？</h2>
+                <p>LangGraph 是 LangChain 的扩展库，用于构建有状态的、多参与者的应用。它将应用建模为<strong>图（Graph）</strong>结构：</p>
+                <ul>
+                    <li><strong>节点（Nodes）</strong>：执行特定操作的函数或链</li>
+                    <li><strong>边（Edges）</strong>：定义节点之间的转换</li>
+                    <li><strong>状态（State）</strong>：在图之间传递的数据</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    LangGraph 特别适合构建<strong>智能体（Agents）</strong>和<strong>复杂工作流</strong>，因为它支持循环、条件分支和状态持久化。
+                </div>
+
+                <h2>LangChain vs LangGraph</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>特性</th>
+                        <th>LangChain (LCEL)</th>
+                        <th>LangGraph</th>
+                    </tr>
+                    <tr>
+                        <td>结构</td>
+                        <td>线性链 / DAG</td>
+                        <td>循环图</td>
+                    </tr>
+                    <tr>
+                        <td>状态管理</td>
+                        <td>隐式传递</td>
+                        <td>显式状态对象</td>
+                    </tr>
+                    <tr>
+                        <td>控制流</td>
+                        <td>简单的分支</td>
+                        <td>复杂的条件边、循环</td>
+                    </tr>
+                    <tr>
+                        <td>持久化</td>
+                        <td>需要手动实现</td>
+                        <td>内置检查点支持</td>
+                    </tr>
+                    <tr>
+                        <td>适用场景</td>
+                        <td>简单的数据处理链</td>
+                        <td>智能体、多轮对话</td>
+                    </tr>
+                </table>
+
+                <h2>安装 LangGraph</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">bash</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-bash"># 安装 LangGraph
+pip install langgraph
+
+# 或者使用 conda
+conda install -c conda-forge langgraph</code></pre>
+                </div>
+
+                <h2>基础图结构</h2>
+
+                <h3>创建简单的 StateGraph</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+import operator
+
+# 1. 定义状态
+class GraphState(TypedDict):
+    """图的状态定义"""
+    messages: Annotated[list, operator.add]  # 消息列表（累积）
+    current_user: str  # 当前用户
+    step_count: int  # 步骤计数
+
+# 2. 定义节点函数
+def node_a(state: GraphState) -> GraphState:
+    """节点 A：处理输入"""
+    print("执行节点 A")
+    return {
+        "messages": ["节点 A 已执行"],
+        "step_count": state.get("step_count", 0) + 1
+    }
+
+def node_b(state: GraphState) -> GraphState:
+    """节点 B：处理数据"""
+    print("执行节点 B")
+    return {
+        "messages": ["节点 B 已执行"],
+        "step_count": state.get("step_count", 0) + 1
+    }
+
+def node_c(state: GraphState) -> GraphState:
+    """节点 C：生成输出"""
+    print("执行节点 C")
+    return {
+        "messages": ["节点 C 已完成"],
+        "step_count": state.get("step_count", 0) + 1
+    }
+
+# 3. 构建图
+workflow = StateGraph(GraphState)
+
+# 添加节点
+workflow.add_node("node_a", node_a)
+workflow.add_node("node_b", node_b)
+workflow.add_node("node_c", node_c)
+
+# 4. 添加边（定义执行顺序）
+workflow.set_entry_point("node_a")
+workflow.add_edge("node_a", "node_b")
+workflow.add_edge("node_b", "node_c")
+workflow.add_edge("node_c", END)
+
+# 5. 编译图
+app = workflow.compile()
+
+# 6. 执行
+result = app.invoke({
+    "messages": [],
+    "current_user": "user_123",
+    "step_count": 0
+})
+
+print(f"\n最终状态: {result}")
+print(f"总步骤数: {result['step_count']}")</code></pre>
+                </div>
+
+                <h2>条件边</h2>
+                <p>根据状态决定下一个节点：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from typing import Literal
+
+def route_decision(state: GraphState) -> Literal["node_b", "node_c"]:
+    """路由函数：根据状态决定下一个节点"""
+    step_count = state.get("step_count", 0)
+
+    if step_count < 3:
+        return "node_b"  # 步骤少则走 B
+    else:
+        return "node_c"  # 步骤多则走 C
+
+# 构建带条件边的图
+workflow = StateGraph(GraphState)
+
+workflow.add_node("node_a", node_a)
+workflow.add_node("node_b", node_b)
+workflow.add_node("node_c", node_c)
+
+# 设置入口
+workflow.set_entry_point("node_a")
+
+# 添加条件边
+workflow.add_conditional_edges(
+    "node_a",
+    route_decision,  # 路由函数
+    {
+        "node_b": "node_b",  # 返回 "node_b" 时跳转到 node_b
+        "node_c": "node_c"   # 返回 "node_c" 时跳转到 node_c
+    }
+)
+
+# 添加普通边
+workflow.add_edge("node_b", END)
+workflow.add_edge("node_c", END)
+
+# 编译并执行
+app = workflow.compile()
+
+result = app.invoke({"messages": [], "step_count": 2})
+print(f"执行了: {result['messages']}")</code></pre>
+                </div>
+
+                <h2>图结构可视化</h2>
+
+                <pre class="mermaid">graph TD
+    Start([开始]) --> A[节点 A]
+    A --> B{条件判断}
+    B -->|steps < 3| C[节点 B]
+    B -->|steps >= 3| D[节点 C]
+    C --> End([结束])
+    D --> End
+
+    style Start fill:#c8e6c9
+    style End fill:#ffcdd2
+    style B fill:#fff9c4</code></pre>
+
+                <h2>循环图</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+def process_input(state: GraphState) -> GraphState:
+    """处理用户输入"""
+    last_message = state["messages"][-1] if state["messages"] else ""
+    response = llm.invoke(f"回复: {last_message}")
+    return {
+        "messages": [response.content],
+        "step_count": state.get("step_count", 0) + 1
+    }
+
+def should_continue(state: GraphState) -> Literal["continue", "end"]:
+    """判断是否继续"""
+    step_count = state.get("step_count", 0)
+    if step_count < 5:  # 最多执行 5 轮
+        return "continue"
+    return "end"
+
+# 构建循环图
+workflow = StateGraph(GraphState)
+
+workflow.add_node("process", process_input)
+
+workflow.set_entry_point("process")
+
+# 添加条件边形成循环
+workflow.add_conditional_edges(
+    "process",
+    should_continue,
+    {
+        "continue": "process",  # 回到自身
+        "end": END
+    }
+)
+
+# 编译
+app = workflow.compile()
+
+# 执行
+result = app.invoke({
+    "messages": ["你好"],
+    "step_count": 0
+})
+
+print(f"总执行次数: {result['step_count']}")</code></pre>
+                </div>
+
+                <h2>多智能体协作</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from typing import Literal
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 定义多智能体状态
+class MultiAgentState(TypedDict):
+    messages: Annotated[list, operator.add]
+    next_agent: str
+    research_data: str
+    final_output: str
+
+# 智能体：研究员
+def researcher(state: MultiAgentState) -> MultiAgentState:
+    print("📚 研究员正在收集信息...")
+    research = llm.invoke("研究主题: " + state["messages"][-1])
+    return {
+        "messages": [f"研究员: {research.content}"],
+        "research_data": research.content,
+        "next_agent": "writer"
+    }
+
+# 智能体：作家
+def writer(state: MultiAgentState) -> MultiAgentState:
+    print("✍️ 作家正在撰写内容...")
+    draft = llm.invoke(f"基于以下研究撰写文章: {state['research_data']}")
+    return {
+        "messages": [f"作家: {draft.content}"],
+        "next_agent": "reviewer"
+    }
+
+# 智能体：审核员
+def reviewer(state: MultiAgentState) -> MultiAgentState:
+    print("👀 审核员正在审核内容...")
+    review = llm.invoke("审核并改进: " + state["messages"][-1])
+    return {
+        "messages": [f"审核员: {review.content}"],
+        "final_output": review.content,
+        "next_agent": "end"
+    }
+
+def route_agent(state: MultiAgentState) -> Literal["researcher", "writer", "reviewer", "end"]:
+    """路由到下一个智能体"""
+    next_agent = state.get("next_agent", "researcher")
+    if next_agent == "end":
+        return "end"
+    return next_agent
+
+# 构建多智能体图
+workflow = StateGraph(MultiAgentState)
+
+workflow.add_node("researcher", researcher)
+workflow.add_node("writer", writer)
+workflow.add_node("reviewer", reviewer)
+
+workflow.set_entry_point("researcher")
+
+# 添加条件边
+workflow.add_conditional_edges(
+    "researcher",
+    route_agent,
+    {
+        "writer": "writer",
+        "end": END
+    }
+)
+
+workflow.add_conditional_edges(
+    "writer",
+    route_agent,
+    {
+        "reviewer": "reviewer",
+        "end": END
+    }
+)
+
+workflow.add_conditional_edges(
+    "reviewer",
+    route_agent,
+    {
+        "end": END
+    }
+)
+
+# 编译并执行
+app = workflow.compile()
+result = app.invoke({
+    "messages": ["写一篇关于人工智能的文章"],
+    "next_agent": "researcher"
+})
+
+print(f"\n最终输出: {result['final_output']}")</code></pre>
+                </div>
+
+                <h2>状态持久化（检查点）</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langgraph.checkpoint.memory import MemorySaver
+
+# 创建检查点保存器（内存存储）
+memory = MemorySaver()
+
+# 使用检查点编译图
+app = workflow.compile(checkpointer=memory)
+
+# 执行时指定 thread_id
+config = {"configurable": {"thread_id": "conversation_123"}}
+
+# 第一次执行
+result = app.invoke(
+    {"messages": ["你好"]},
+    config=config
+)
+
+print(f"第一次: {result['messages']}")
+
+# 第二次执行 - 会从上次状态继续
+result = app.invoke(
+    {"messages": ["你叫什么名字？"]},
+    config=config
+)
+
+print(f"第二次: {result['messages']}")
+
+# 查看历史状态
+state_history = app.get_state(config)
+print(f"历史状态: {state_history.values}")</code></pre>
+                </div>
+
+                <div class="note" data-label="检查点">
+                    检查点支持<strong>时间旅行</strong>——你可以回到之前的任何状态，恢复执行。这对于调试和版本回滚非常有用。
+                </div>
+
+                <h2>流式输出 LangGraph</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># 流式执行图
+async def stream_graph():
+    async for event in app.astream(
+        {"messages": ["你好"]},
+        config={"configurable": {"thread_id": "test"}}
+    ):
+        # event 可能是:
+        # - {"node_a": {...}}  # 节点输出
+        # - "__end__": {...}  # 图结束
+        for node_name, node_output in event.items():
+            print(f"节点 {node_name}: {node_output}")
+
+# 同步流式
+for event in app.stream({"messages": ["你好"]}):
+    print(event)</code></pre>
+                </div>
+
+                <h2>LangGraph 架构图</h2>
+
+                <pre class="mermaid">graph TD
+    Input([用户输入]) --> Graph[LangGraph 应用]
+    Graph --> Nodes[节点集合]
+
+    Nodes --> N1[节点1: 研究员]
+    Nodes --> N2[节点2: 作家]
+    Nodes --> N3[节点3: 审核员]
+
+    N1 --> Router{路由决策}
+    N2 --> Router
+    N3 --> Router
+
+    Router --> Checkpoint[检查点]
+    Router --> N1
+    Router --> Output([最终输出])
+
+    Checkpoint -.恢复.-> Graph
+
+    style Graph fill:#e1f5fe
+    style Router fill:#fff9c4
+    style Checkpoint fill:#c8e6c9</code></pre>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 设计清晰的状态结构</h3>
+                    <ul>
+                        <li>使用 TypedDict 定义状态</li>
+                        <li>使用 Annotated 修饰可累积的字段</li>
+                        <li>避免状态过于复杂</li>
+                    </ul>
+
+                    <h3>2. 节点职责单一</h3>
+                    <ul>
+                        <li>每个节点只做一件事</li>
+                        <li>避免节点之间的隐式依赖</li>
+                        <li>通过状态传递数据</li>
+                    </ul>
+
+                    <h3>3. 使用检查点</h3>
+                    <ul>
+                        <li>生产环境必须启用检查点</li>
+                        <li>选择合适的存储后端</li>
+                        <li>定期清理过期数据</li>
+                    </ul>
+
+                    <h3>4. 错误处理</h3>
+                    <ul>
+                        <li>在节点中捕获异常</li>
+                        <li>使用特殊状态标记错误</li>
+                        <li>实现重试逻辑</li>
+                    </ul>
+
+                    <h3>5. 测试图</h3>
+                    <ul>
+                        <li>单独测试每个节点</li>
+                        <li>测试条件边逻辑</li>
+                        <li>模拟完整工作流</li>
+                    </ul>
+                </div>
+
+                <h2>何时使用 LangGraph</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>场景</th>
+                        <th>使用 LangChain</th>
+                        <th>使用 LangGraph</th>
+                    </tr>
+                    <tr>
+                        <td>简单问答</td>
+                        <td>✓ 推荐</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td>单次数据处理</td>
+                        <td>✓ 推荐</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td>多轮对话</td>
+                        <td>-</td>
+                        <td>✓ 推荐</td>
+                    </tr>
+                    <tr>
+                        <td>循环执行</td>
+                        <td>-</td>
+                        <td>✓ 推荐</td>
+                    </tr>
+                    <tr>
+                        <td>多智能体协作</td>
+                        <td>-</td>
+                        <td>✓ 推荐</td>
+                    </tr>
+                    <tr>
+                        <td>复杂条件分支</td>
+                        <td>-</td>
+                        <td>✓ 推荐</td>
+                    </tr>
+                </table>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. LangGraph 中什么定义了在节点之间传递的数据？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. Edge</div>
+                            <div class="option">B. Node</div>
+                            <div class="option correct-option">C. State</div>
+                            <div class="option">D. Graph</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 哪个方法用于添加条件边？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. add_edge</div>
+                            <div class="option correct-option">B. add_conditional_edges</div>
+                            <div class="option">C. set_entry_point</div>
+                            <div class="option">D. add_node</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. 检查点的主要功能是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. 提高性能</div>
+                            <div class="option">B. 降低成本</div>
+                            <div class="option correct-option">C. 状态持久化和恢复</div>
+                            <div class="option">D. 并行执行</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：创建一个简单的三节点图
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from langgraph.graph import StateGraph, END
+
+workflow = StateGraph(GraphState)
+workflow.____("node_a", node_a)
+workflow.____("node_a", "node_b")
+workflow.____("node_b", END)
+
+app = workflow.____()</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个 LangGraph 应用，实现一个简单的客服机器人：接收用户问题 -> 分类 -> 回答 -> 满意度检查
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你需要构建一个代码审查系统，包含三个智能体：代码分析员、安全专家、优化建议员。它们需要依次处理代码，每个专家处理后可以决定是否继续或结束。你会如何设计这个 LangGraph 应用？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="16-evaluation.html">← 上一章：评估框架</a>
+                    <a href="18-best-practices.html" class="next">下一章：最佳实践 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

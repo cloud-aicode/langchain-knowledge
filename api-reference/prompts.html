@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提示模板 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-prompts">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>提示模板 API</h1>
+                <p class="subtitle">PromptTemplate 与消息模板</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#classes" class="api-nav-link">核心类</a>
+                    <a href="#methods" class="api-nav-link">方法</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>提示模板是 LangChain 中管理 LLM 输入的核心组件，提供参数化、验证和格式化功能。</p>
+
+                <pre class="mermaid">graph TD
+                    A[BasePromptTemplate] --> B[PromptTemplate]
+                    A --> C[ChatPromptTemplate]
+                    A --> D[MessagesPlaceholder]
+
+                    C --> E[SystemMessagePromptTemplate]
+                    C --> F[HumanMessagePromptTemplate]
+                    C --> G[AIMessagePromptTemplate]
+
+                    A --> H[FewShotPromptTemplate]
+                    A --> I[PipelinePromptTemplate]
+
+                    style A fill:#e1f5fe
+                    style C fill:#c8e6c9</code></pre>
+
+                <h2 id="classes">核心类</h2>
+
+                <div class="api-section" id="baseprompttemplate">
+                    <h3 class="api-title">BasePromptTemplate</h3>
+                    <p class="api-description">所有提示模板的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class BasePromptTemplate(Serializable, Generic[InputVariables, OutputType]):
+    """提示模板基类"""
+
+    @property
+    @abstractmethod
+    def input_variables(self) -> List[str]:
+        """输入变量名列表"""
+
+    @abstractmethod
+    def format(**kwargs: Any) -> OutputType:
+        """格式化模板"""
+
+    @abstractmethod
+    def partial(**kwargs: Any) -> "BasePromptTemplate":
+        """部分填充模板"""
+
+    def invoke(
+        self,
+        input: Dict[str, Any],
+        config: Optional[RunnableConfig] = None,
+    ) -> OutputType:
+        """调用模板（Runnable 接口）"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section" id="prompttemplate">
+                    <h3 class="api-title">PromptTemplate</h3>
+                    <p class="api-description">字符串提示模板，用于生成纯文本提示。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class PromptTemplate(BasePromptTemplate[Dict[str, Any], str]):
+    """字符串提示模板"""
+
+    template: str = ""
+    """模板字符串，使用 {variable} 语法"""
+
+    input_variables: List[str] = []
+    """输入变量名列表"""
+
+    template_format: str = "f-string"
+    """模板格式: f-string, jinja2"""
+
+    validate_template: bool = False
+    """是否验证模板"""
+
+    partial_variables: Dict[str, Any] = {}
+    """部分填充的变量"""</code></pre>
+                    </div>
+
+                    <h4>构造方法</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import PromptTemplate
+
+# 方式1: 使用 from_template
+prompt = PromptTemplate.from_template(
+    "Tell me a joke about {topic}"
+)
+
+# 方式2: 直接实例化
+prompt = PromptTemplate(
+    template="Tell me a joke about {topic}",
+    input_variables=["topic"]
+)
+
+# 方式3: 使用 template_format
+jinja_prompt = PromptTemplate(
+    template="Tell me a joke about {{ topic }}",
+    input_variables=["topic"],
+    template_format="jinja2"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section" id="chatprompttemplate">
+                    <h3 class="api-title">ChatPromptTemplate</h3>
+                    <p class="api-description">聊天消息提示模板。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class ChatPromptTemplate(BasePromptTemplate[Dict[str, Any], List[BaseMessage]]):
+    """聊天提示模板"""
+
+    messages: List[Union[MessagePromptTemplate, MsgPlaceholder]]
+    """消息模板列表"""
+
+    input_variables: List[str] = []
+    """输入变量"""</code></pre>
+                    </div>
+
+                    <h4>创建方式</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+
+# 方式1: 使用 from_messages
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    ("user", "{input}")
+])
+
+# 方式2: 使用消息类
+from langchain_core.prompts import (
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate
+)
+
+system_prompt = SystemMessagePromptTemplate.from_template(
+    "You are a {role} assistant"
+)
+user_prompt = HumanMessagePromptTemplate.from_template("{input}")
+prompt = ChatPromptTemplate.from_messages([system_prompt, user_prompt])
+
+# 方式3: 使用字符串元组
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    MessagesPlaceholder(variable_name="history"),  # 对话历史
+    ("user", "{input}")
+])</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section" id="messagesplaceholder">
+                    <h3 class="api-title">MessagesPlaceholder</h3>
+                    <p class="api-description">消息占位符，用于插入动态消息列表。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class MessagesPlaceholder(BasePromptTemplate):
+    """消息占位符"""
+
+    variable_name: str
+    """变量名"""
+
+    optional: bool = False
+    """是否可选"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import (
+    ChatPromptTemplate,
+    MessagesPlaceholder
+)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    MessagesPlaceholder(variable_name="history"),  # 插入对话历史
+    ("user", "{input}")
+])
+
+# 使用
+formatted = prompt.format_messages(
+    history=[
+        ("user", "你好"),
+        ("ai", "你好！有什么可以帮助你的？")
+    ],
+    input="介绍一下 LangChain"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section" id="fewshotprompttemplate">
+                    <h3 class="api-title">FewShotPromptTemplate</h3>
+                    <p class="api-description">少样本提示模板，提供示例。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class FewShotPromptTemplate(BasePromptTemplate[Dict[str, Any], str]):
+    """少样本提示模板"""
+
+    examples: List[Dict[str, Any]]
+    """示例列表"""
+
+    example_prompt: PromptTemplate
+    """单个示例的模板"""
+
+    suffix: str
+    """后缀模板"""
+
+    prefix: str = ""
+    """前缀模板"""
+
+    example_separator: str = "\n\n"
+    """示例分隔符"""
+
+    input_variables: List[str]
+    """输入变量"""</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
+
+# 定义示例
+examples = [
+    {"question": "巴黎", "answer": "法国"},
+    {"question": "东京", "answer": "日本"},
+    {"question": "伦敦", "answer": "英国"}
+]
+
+# 示例模板
+example_prompt = PromptTemplate(
+    input_variables=["question", "answer"],
+    template="问题: {question}\n答案: {answer}"
+)
+
+# 创建 FewShot 模板
+prompt = FewShotPromptTemplate(
+    examples=examples,
+    example_prompt=example_prompt,
+    prefix="以下是首都与其对应的国家：",
+    suffix="\n问题: {input}\n答案:",
+    input_variables=["input"]
+)
+
+# 使用
+formatted = prompt.format(input="北京")
+print(formatted)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">PipelinePromptTemplate</h3>
+                    <p class="api-description">管道提示模板，组合多个模板。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">class PipelinePromptTemplate(BasePromptTemplate):
+    """管道提示模板"""
+
+    pipeline_prompts: List[Tuple[str, BasePromptTemplate]]
+    """(名称, 模板) 列表"""
+
+    final_prompt: PromptTemplate
+    """最终模板，引用所有命名组件"""</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="methods">核心方法</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">format</h3>
+                    <p class="api-description">格式化模板。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def format(**kwargs: Any) -> Union[str, List[BaseMessage]]:
+    """
+    格式化模板
+
+    Args:
+        **kwargs: 变量值
+
+    Returns:
+        格式化后的字符串或消息列表
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">format_messages</h3>
+                    <p class="api-description">格式化为消息列表（仅 ChatPromptTemplate）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def format_messages(**kwargs: Any) -> List[BaseMessage]:
+    """
+    格式化为消息列表
+
+    Args:
+        **kwargs: 变量值
+
+    Returns:
+        消息列表
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">partial</h3>
+                    <p class="api-description">部分填充模板，返回新模板。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def partial(**kwargs: Any) -> BasePromptTemplate:
+    """
+    部分填充
+
+    Args:
+        **kwargs: 要预先填充的变量
+
+    Returns:
+        部分填充的新模板
+    """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate(
+    template="Tell me a {adjective} joke about {topic}",
+    input_variables=["adjective", "topic"]
+)
+
+# 部分填充
+funny_prompt = prompt.partial(adjective="funny")
+
+# 现在只需要提供 topic
+result = funny_prompt.format(topic="Python")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">invoke</h3>
+                    <p class="api-description">作为 Runnable 调用。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">def invoke(
+    input: Dict[str, Any],
+    config: Optional[RunnableConfig] = None,
+) -> Union[str, List[BaseMessage]]:
+    """
+    调用模板
+
+    Args:
+        input: 变量字典
+        config: 运行配置
+
+    Returns:
+        格式化结果
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">from_template</h3>
+                    <p class="api-description">类方法，从字符串创建模板。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">@classmethod
+def from_template(
+    cls,
+    template: str,
+    *,
+    template_format: str = "f-string",
+    partial_variables: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> "PromptTemplate":
+    """
+    从模板字符串创建
+
+    Args:
+        template: 模板字符串
+        template_format: 模板格式
+        partial_variables: 部分变量
+        **kwargs: 额外参数
+
+    Returns:
+        PromptTemplate 实例
+    """</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">from_messages</h3>
+                    <p class="api-description">ChatPromptTemplate 类方法，从消息创建。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">@classmethod
+def from_messages(
+    cls,
+    messages: Sequence[
+        Union[
+            Tuple[str, str],  # (role, template)
+            BaseMessage,       # 直接消息
+            MessagePromptTemplate,
+        ]
+    ],
+) -> "ChatPromptTemplate":
+    """
+    从消息创建模板
+
+    Args:
+        messages: 消息模板列表
+
+    Returns:
+        ChatPromptTemplate 实例
+    """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.prompts import (
+    PromptTemplate,
+    ChatPromptTemplate,
+    MessagesPlaceholder
+)
+from langchain_openai import ChatOpenAI
+
+# ========== PromptTemplate 示例 ==========
+
+# 基础使用
+prompt = PromptTemplate.from_template(
+    "Tell me a {adjective} story about {topic}"
+)
+formatted = prompt.format(adjective="funny", topic="Python")
+
+# 部分填充
+base_prompt = PromptTemplate.from_template(
+    "Write a {style} email about {topic} to {recipient}"
+)
+professional_prompt = base_prompt.partial(style="professional")
+
+# ========== ChatPromptTemplate 示例 ==========
+
+# 简单聊天模板
+chat_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant specialized in {domain}"),
+    ("user", "{input}")
+])
+
+# 带历史记录的聊天
+chat_with_history = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    MessagesPlaceholder(variable_name="history"),
+    ("user", "{input}")
+])
+
+# ========== 与 LLM 集成 ==========
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 方式1: 手动格式化
+prompt = PromptTemplate.from_template("What is {topic}?")
+formatted = prompt.format(topic="LangChain")
+response = llm.invoke(formatted)
+
+# 方式2: 使用管道（推荐）
+chain = prompt | llm
+response = chain.invoke({"topic": "LangChain"})
+
+# 聊天链
+chat_chain = chat_prompt | llm
+response = chat_chain.invoke({
+    "domain": "Python programming",
+    "input": "What is a decorator?"
+})
+
+# ========== 动态示例选择 ==========
+
+from langchain_core.prompts import FewShotPromptTemplate
+
+examples = [
+    {"input": "happy", "output": " joyful"},
+    {"input": "sad", "output": " sorrowful"},
+]
+
+example_prompt = PromptTemplate(
+    input_variables=["input", "output"],
+    template="Input: {input}\nOutput: {output}"
+)
+
+few_shot_prompt = FewShotPromptTemplate(
+    examples=examples,
+    example_prompt=example_prompt,
+    prefix="Give the synonym for the following words:",
+    suffix="\nInput: {input}\nOutput:",
+    input_variables=["input"]
+)
+
+chain = few_shot_prompt | llm
+response = chain.invoke({"input": "excited"})</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="chat-models.html">Chat Models API</a></li>
+                    <li><a href="runnables.html">Runnables API</a></li>
+                    <li><a href="../03-prompts.html">教程：提示工程</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="chat-models.html">← Chat Models API</a>
+                    <a href="chains.html" class="next">Chains API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

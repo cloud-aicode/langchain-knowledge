@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangChain 1.0 知识点 - 目录</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-index">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">
+                    知识比赛知识点
+                </p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>LangChain 1.0 知识比赛</h1>
+                <p class="subtitle">Python 版本完整知识点整理</p>
+
+                <div style="margin: 40px 0;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                        <a href="01-quickstart.html" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🚀</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">快速入门</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">安装配置、第一个 Agent</div>
+                        </a>
+                        <a href="02-models.html" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🤖</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">模型模块</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">LLM、ChatModel、流式输出</div>
+                        </a>
+                        <a href="03-prompts.html" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">💬</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">提示工程</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">模板、输出解析、Few-shot</div>
+                        </a>
+                        <a href="04-chains.html" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">⛓️</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">链式调用</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">LCEL、Runnable接口</div>
+                        </a>
+                        <a href="05-agents.html" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🎯</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">智能体</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">ReAct、Tool Calling</div>
+                        </a>
+                        <a href="06-tools.html" style="background: linear-gradient(135deg, #ec4899, #db2777); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🔧</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">工具系统</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">自定义工具、工具包</div>
+                        </a>
+                        <a href="07-memory.html" style="background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🧠</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">记忆管理</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">对话历史、持久化</div>
+                        </a>
+                        <a href="08-embeddings.html" style="background: linear-gradient(135deg, #84cc16, #65a30d); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">嵌入向量</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">向量存储、语义搜索</div>
+                        </a>
+                        <a href="09-retrieval.html" style="background: linear-gradient(135deg, #14b8a6, #0d9488); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">📚</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">RAG 检索</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">文档问答、混合检索</div>
+                        </a>
+                        <a href="10-best-practices.html" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; padding: 25px; border-radius: 15px; text-decoration: none; transition: transform 0.3s;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">⭐</div>
+                            <div style="font-size: 1.2rem; font-weight: 600;">最佳实践</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">生产部署、性能优化</div>
+                        </a>
+                    </div>
+                </div>
+
+                <div style="margin-top: 60px; padding: 30px; background: rgba(59, 130, 246, 0.1); border-radius: 15px;">
+                    <h2 style="margin-top: 0; font-size: 1.5rem;">📖 学习路径建议</h2>
+                    <div style="margin-top: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <strong>第一步：</strong>阅读 <a href="01-quickstart.html" style="color: var(--primary-color);">快速入门</a>，了解 LangChain 基础概念
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>第二步：</strong>学习 <a href="02-models.html" style="color: var(--primary-color);">模型模块</a>、<a href="03-prompts.html" style="color: var(--primary-color);">提示工程</a>、<a href="04-chains.html" style="color: var(--primary-color);">链式调用</a>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>第三步：</strong>掌握 <a href="05-agents.html" style="color: var(--primary-color);">智能体</a>、<a href="06-tools.html" style="color: var(--primary-color);">工具系统</a>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>第四步：</strong>深入 <a href="07-memory.html" style="color: var(--primary-color);">记忆管理</a>、<a href="08-embeddings.html" style="color: var(--primary-color);">嵌入向量</a>、<a href="09-retrieval.html" style="color: var(--primary-color);">RAG检索</a>
+                        </div>
+                        <div>
+                            <strong>第五步：</strong>学习 <a href="10-best-practices.html" style="color: var(--primary-color);">最佳实践</a>，准备生产部署
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 40px; padding: 30px; background: rgba(16, 185, 129, 0.1); border-radius: 15px;">
+                    <h2 style="margin-top: 0; font-size: 1.5rem;">🎯 比赛准备清单</h2>
+                    <ul style="margin-top: 20px;">
+                        <li><input type="checkbox" style="margin-right: 10px;"> 理解 LangChain 1.0 包架构（langchain、langchain-core、langchain-classic）</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 掌握 create_agent 新语法</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 熟悉 LCEL (LangChain Expression Language)</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 能实现自定义 Tool</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 理解 Memory 持久化方案</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 掌握 RAG 完整流程</li>
+                        <li><input type="checkbox" style="margin-right: 10px;"> 了解生产环境部署最佳实践</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: 40px; text-align: center; color: rgba(0,0,0,0.5); font-size: 0.9rem;">
+                    <p>基于 LangChain 1.0 Python 官方文档整理</p>
+                    <p style="margin-top: 5px;">参考：<a href="https://docs.langchain.com/oss/python/langchain/overview" target="_blank" style="color: var(--primary-color);">docs.langchain.com</a></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

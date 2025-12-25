@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>嵌入模型 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-embeddings">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>嵌入模型 API</h1>
+                <p class="subtitle">Embeddings 与向量生成</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#implementations" class="api-nav-link">实现类</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>嵌入模型将文本转换为高维向量表示，用于语义搜索、相似度计算和 RAG 应用。</p>
+
+                <pre class="mermaid">graph TD
+                    A[Embeddings] --> B[OpenAIEmbeddings]
+                    A --> C[HuggingFaceEmbeddings]
+                    A --> D[CohereEmbeddings]
+                    A --> E[BedrockEmbeddings]
+
+                    A --> F[本地模型]
+                    F --> G[SpacyEmbeddings]
+                    F --> H[JinaEmbeddings]
+
+                    style A fill:#e1f5fe
+                    style B fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">Embeddings</h3>
+                    <p class="api-description">所有嵌入模型的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.embeddings import Embeddings
+
+class Embeddings(ABC):
+    """嵌入模型基类"""
+
+    @abstractmethod
+    def embed_documents(
+        self,
+        texts: List[str],
+    ) -> List[List[float]]:
+        """
+        嵌入文档列表
+
+        Args:
+            texts: 文本列表
+
+        Returns:
+            嵌入向量列表（每个向量是浮点数列表）
+        """
+
+    @abstractmethod
+    def embed_query(self, text: str) -> List[float]:
+        """
+        嵌入查询文本
+
+        Args:
+            text: 查询文本
+
+        Returns:
+            嵌入向量
+        """
+
+    async def aembed_documents(
+        self,
+        texts: List[str],
+    ) -> List[List[float]]:
+        """异步嵌入文档列表"""
+        return await asyncio.to_thread(self.embed_documents, texts)
+
+    async def aembed_query(self, text: str) -> List[float]:
+        """异步嵌入查询文本"""
+        return await asyncio.to_thread(self.embed_query, text)
+
+    def embed_documents_asynchronously(
+        self,
+        texts: List[str],
+        batch_size: int = 100,
+    ) -> List[List[float]]:
+        """
+        批量异步嵌入文档
+
+        Args:
+            texts: 文本列表
+            batch_size: 批处理大小
+
+        Returns:
+            嵌入向量列表
+        """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="implementations">实现类</h2>
+
+                <div class="api-section" id="openaiembeddings">
+                    <h3 class="api-title">OpenAIEmbeddings</h3>
+                    <p class="api-description">OpenAI 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_openai import OpenAIEmbeddings
+
+class OpenAIEmbeddings(BaseModel, Embeddings):
+    """OpenAI 嵌入模型"""
+
+    def __init__(
+        self,
+        model: str = "text-embedding-3-small",
+        embedding_ctx_length: Optional[int] = None,
+        chunk_size: int = 1000,
+        max_retries: int = 6,
+        request_timeout: Optional[Union[float, Tuple[float, float]]] = None,
+        openai_api_key: Optional[str] = None,
+        openai_organization: Optional[str] = None,
+        openai_proxy: Optional[str] = None,
+        openai_api_base: Optional[str] = None,
+        dimensions: Optional[int] = None,
+    ):
+        """
+        初始化 OpenAI 嵌入
+
+        Args:
+            model: 模型名称
+                - text-embedding-3-small: 1536 维
+                - text-embedding-3-large: 3072 维
+                - text-embedding-ada-002: 1536 维
+            embedding_ctx_length: 最大上下文长度
+            chunk_size: 批处理大小
+            max_retries: 最大重试次数
+            request_timeout: 请求超时
+            openai_api_key: API 密钥
+            openai_organization: 组织 ID
+            openai_proxy: 代理地址
+            openai_api_base: API 基础 URL
+            dimensions: 输出维度（仅 text-embedding-3 支持）
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_openai import OpenAIEmbeddings
+
+# 基础使用
+embeddings = OpenAIEmbeddings()
+
+# 使用特定模型
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+# 设置输出维度（仅 text-embedding-3 支持）
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    dimensions=512  # 降维到 512
+)
+
+# 嵌入查询
+query_vector = embeddings.embed_query("什么是 LangChain？")
+print(f"向量维度: {len(query_vector)}")
+
+# 嵌入文档列表
+doc_vectors = embeddings.embed_documents([
+    "LangChain 是一个框架",
+    "用于构建 LLM 应用"
+])</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section" id="huggingfaceembeddings">
+                    <h3 class="api-title">HuggingFaceEmbeddings</h3>
+                    <p class="api-description">Hugging Face 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_huggingface import HuggingFaceEmbeddings
+
+class HuggingFaceEmbeddings(BaseModel, Embeddings):
+    """Hugging Face 嵌入模型"""
+
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/all-mpnet-base-v2",
+        cache_folder: Optional[str] = None,
+        model_kwargs: Optional[Dict[str, Any]] = None,
+        encode_kwargs: Optional[Dict[str, Any]] = None,
+        multi_process: bool = False,
+        show_progress: bool = True,
+    ):
+        """
+        初始化 HuggingFace 嵌入
+
+        Args:
+            model_name: 模型名称
+                - sentence-transformers/all-mpnet-base-v2
+                - sentence-transformers/all-MiniLM-L6-v2
+                - sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+            cache_folder: 模型缓存目录
+            model_kwargs: 传递给模型的参数
+                - device: "cuda" 或 "cpu"
+            encode_kwargs: 编码参数
+                - batch_size: 批处理大小
+                - normalize_embeddings: 是否归一化
+            multi_process: 是否使用多进程
+            show_progress: 是否显示进度
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_huggingface import HuggingFaceEmbeddings
+
+# 基础使用（英文模型）
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+# 多语言模型
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+)
+
+# 使用 GPU
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-mpnet-base-v2",
+    model_kwargs={"device": "cuda"}
+)
+
+# 自定义编码参数
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-mpnet-base-v2",
+    encode_kwargs={
+        "batch_size": 32,
+        "normalize_embeddings": True
+    }
+)
+
+# 嵌入
+query_vector = embeddings.embed_query("搜索查询")
+doc_vectors = embeddings.embed_documents(["文档1", "文档2"])</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">CohereEmbeddings</h3>
+                    <p class="api-description">Cohere 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_cohere import CohereEmbeddings
+
+embeddings = CohereEmbeddings(
+    model="embed-english-v3.0",
+    cohere_api_key="your-api-key"
+)
+
+# 可用模型:
+# - embed-english-v3.0: 英文
+# - embed-multilingual-v3.0: 多语言
+# - embed-english-light-v3.0: 轻量英文
+# - embed-multilingual-light-v3.0: 轻量多语言</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">BedrockEmbeddings</h3>
+                    <p class="api-description">AWS Bedrock 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_aws import BedrockEmbeddings
+
+embeddings = BedrockEmbeddings(
+    model_id="amazon.titan-embed-text-v1",
+    region_name="us-east-1"
+)
+
+# 可用模型:
+# - amazon.titan-embed-text-v1
+# - amazon.titan-embed-image-v1
+# - cohere.embed-english-v3 (通过 Bedrock)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">GoogleGenerativeAIEmbeddings</h3>
+                    <p class="api-description">Google Gemini 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001",
+    google_api_key="your-api-key"
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">JinaEmbeddings</h3>
+                    <p class="api-description">Jina AI 嵌入模型（本地/云端）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.embeddings import JinaEmbeddings
+
+# 使用云端 API
+embeddings = JinaEmbeddings(
+    jina_api_key="your-api-key",
+    model_name="jina-embeddings-v2"  # 或 jina-embeddings-v2-base
+)
+
+# 使用本地模型
+embeddings = JinaEmbeddings(
+    model_name="jina-embeddings-v2-base",
+    # 自动下载并使用本地模型
+)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">SpacyEmbeddings</h3>
+                    <p class="api-description">spaCy 嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.embeddings import SpacyEmbeddings
+
+embeddings = SpacyEmbeddings(
+    model_name="en_core_web_md"  # 需要先下载: python -m spacy download en_core_web_md
+)
+
+# 可用模型:
+# - en_core_web_md: 中等英文模型
+# - en_core_web_lg: 大型英文模型
+# - zh_core_web_md: 中等中文模型</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">InstructorEmbeddings</h3>
+                    <p class="api-description">支持指令的嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.embeddings import HuggingFaceInstructEmbeddings
+
+embeddings = HuggingFaceInstructEmbeddings(
+    model_name="hkunlp/instructor-large",
+    model_kwargs={"device": "cuda"},
+    encode_kwargs={
+        "normalize_embeddings": True
+    }
+)
+
+# 带指令嵌入
+query_vector = embeddings.embed_query(
+    "Represent the sentence for retrieving relevant documents:"
+    "What is Python?"
+)
+doc_vector = embeddings.embed_documents(
+    ["Python is a programming language"]
+)[0]</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">LlamaCppEmbeddings</h3>
+                    <p class="api-description">llama.cpp 本地嵌入。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.embeddings import LlamaCppEmbeddings
+
+embeddings = LlamaCppEmbeddings(
+    model_path="path/to/model.gguf",
+    n_ctx=2048,
+    n_threads=4
+)
+
+query_vector = embeddings.embed_query("查询文本")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">FakeEmbeddings</h3>
+                    <p class="api-description">用于测试的假嵌入模型。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.embeddings import FakeEmbeddings
+
+embeddings = FakeEmbeddings(size=1536)
+
+# 返回固定大小的随机向量
+query_vector = embeddings.embed_query("任意文本")</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 基础嵌入 ==========
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
+
+# 嵌入查询
+query_vector = embeddings.embed_query("什么是机器学习？")
+print(f"向量维度: {len(query_vector)}")
+
+# 嵌入文档
+doc_vectors = embeddings.embed_documents([
+    "机器学习是人工智能的一个分支",
+    "深度学习是机器学习的子集"
+])
+
+# ========== 示例2: 计算相似度 ==========
+import numpy as np
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+query = "Python 编程语言"
+docs = ["Python 是一种高级编程语言", "Java 也很流行"]
+
+query_vec = embeddings.embed_query(query)
+doc_vecs = embeddings.embed_documents(docs)
+
+for doc, vec in zip(docs, doc_vecs):
+    similarity = cosine_similarity(query_vec, vec)
+    print(f"{doc}: {similarity:.4f}")
+
+# ========== 示例3: 异步嵌入 ==========
+import asyncio
+
+async def async_embedding():
+    query_vec = await embeddings.aembed_query("查询")
+    doc_vecs = await embeddings.aembed_documents(["文档1", "文档2"])
+    return query_vec, doc_vecs
+
+asyncio.run(async_embedding())
+
+# ========== 示例4: 使用本地模型 ==========
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# 下载并使用本地模型
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    model_kwargs={"device": "cpu"},
+    encode_kwargs={"normalize_embeddings": True}
+)
+
+# ========== 示例5: 批量嵌入大量文档 ==========
+def batch_embed(texts, batch_size=100):
+    """批量嵌入大量文档"""
+    all_vectors = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        vectors = embeddings.embed_documents(batch)
+        all_vectors.extend(vectors)
+        print(f"已处理 {min(i+batch_size, len(texts))}/{len(texts)}")
+    return all_vectors
+
+texts = ["文档" + str(i) for i in range(1000)]
+vectors = batch_embed(texts, batch_size=100)
+
+# ========== 示例6: 多语言嵌入 ==========
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# 多语言模型
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+)
+
+# 支持中文、英文等
+query_zh = embeddings.embed_query("什么是人工智能？")
+query_en = embeddings.embed_query("What is AI?")
+
+# 计算跨语言相似度
+similarity = cosine_similarity(query_zh, query_en)
+print(f"跨语言相似度: {similarity:.4f}")
+
+# ========== 示例7: 降维嵌入 ==========
+from langchain_openai import OpenAIEmbeddings
+
+# text-embedding-3 支持自定义维度
+embeddings_small = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    dimensions=256  # 降到 256 维
+)
+
+vector = embeddings_small.embed_query("测试")
+print(f"降维后向量维度: {len(vector)}")</code></pre>
+                </div>
+
+                <h2>模型对比</h2>
+
+                <div class="comparison-table">
+                    <tr>
+                        <th>模型</th>
+                        <th>维度</th>
+                        <th>语言</th>
+                        <th>部署</th>
+                    </tr>
+                    <tr>
+                        <td>text-embedding-3-small</td>
+                        <td>1536</td>
+                        <td>多语言</td>
+                        <td>云端</td>
+                    </tr>
+                    <tr>
+                        <td>text-embedding-3-large</td>
+                        <td>3072</td>
+                        <td>多语言</td>
+                        <td>云端</td>
+                    </tr>
+                    <tr>
+                        <td>all-MiniLM-L6-v2</td>
+                        <td>384</td>
+                        <td>英文</td>
+                        <td>本地</td>
+                    </tr>
+                    <tr>
+                        <td>paraphrase-multilingual-MiniLM</td>
+                        <td>384</td>
+                        <td>多语言</td>
+                        <td>本地</td>
+                    </tr>
+                    <tr>
+                        <td>jina-embeddings-v2</td>
+                        <td>768</td>
+                        <td>多语言</td>
+                        <td>云端/本地</td>
+                    </tr>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="vector-stores.html">Vector Stores API</a></li>
+                    <li><a href="retrievers.html">Retrievers API</a></li>
+                    <li><a href="../11-embeddings.html">教程：嵌入向量</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="text-splitters.html">← Text Splitters API</a>
+                    <a href="vector-stores.html" class="next">Vector Stores API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

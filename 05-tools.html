@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具系统 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-tools">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>工具系统 (Tools)</h1>
+                <p class="subtitle">扩展 LLM 能力的外部功能集成</p>
+
+                <h2>基础工具定义</h2>
+
+                <h3>@tool 装饰器</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool
+
+# 简单工具
+@tool
+def greet(name: str) -> str:
+    """向指定的人问好"""
+    return f"你好，{name}！"
+
+# 使用
+result = greet.invoke("小明")
+print(result)  # "你好，小明！"
+
+# 查看工具的 JSON Schema
+print(greet.name)  # 'greet'
+print(greet.description)  # '向指定的人问好'
+print(greet.args)</code></pre>
+                </div>
+
+                <h3>带 schema 的工具</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from pydantic import BaseModel, Field
+from langchain_core.tools import tool
+
+class SearchInput(BaseModel):
+    """搜索输入"""
+    query: str = Field(..., description="搜索关键词")
+    limit: int = Field(default=5, description="结果数量限制")
+
+@tool(args_schema=SearchInput)
+def search(input: SearchInput) -> str:
+    """搜索信息"""
+    return f"搜索 '{input.query}'，返回 {input.limit} 条结果"</code></pre>
+                </div>
+
+                <h2>bind_tools() 方法（v1.0 新特性）</h2>
+
+                <p><code>bind_tools()</code> 允许直接将工具绑定到 LLM，无需创建完整的 Agent：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+
+@tool
+def get_weather(location: str) -> str:
+    """获取指定城市的天气信息"""
+    # 模拟天气查询
+    return f"{location} 今天 25°C，晴天"
+
+@tool
+def get_time(city: str) -> str:
+    """获取指定城市的当前时间"""
+    from datetime import datetime
+    return f"{city} 当前时间: {datetime.now().strftime('%H:%M')}"
+
+# 创建 LLM
+llm = ChatOpenAI(model="gpt-4o")
+
+# 直接绑定工具
+llm_with_tools = llm.bind_tools(
+    [get_weather, get_time],
+    tool_choice="auto"  # 自动选择工具
+)
+
+# 调用：LLM 会自动决定是否使用工具
+response = llm_with_tools.invoke("北京今天天气怎么样？")
+
+# 查看工具调用
+if response.tool_calls:
+    for call in response.tool_calls:
+        print(f"调用工具: {call['name']}")
+        print(f"参数: {call['args']}")
+        # 执行工具
+        if call['name'] == 'get_weather':
+            result = get_weather(**call['args'])
+            print(f"结果: {result}")</code></pre>
+                </div>
+
+                <pre class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant L as LLM + bind_tools
+    participant T as 工具
+
+    U->>L: "北京天气怎么样？"
+    L->>L: 分析需要工具
+    L->>T: 调用 get_weather
+    T-->>L: 返回结果
+    L-->>U: "北京今天 25°C"</code></pre>
+
+                <div class="tip" data-label="v1.0 新特性">
+                    <code>bind_tools()</code> 是 LangChain 1.0 的新 API，比传统的 <code>create_agent</code> 更简洁，适合简单的工具调用场景。
+                </div>
+
+                <h2>常用内置工具</h2>
+
+                <h3>网络搜索工具</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.tools import GoogleSearchRun
+from langchain_community.utilities import GoogleSearchAPIWrapper
+
+# 创建搜索工具
+search = GoogleSearchRun(
+    api_wrapper=GoogleSearchAPIWrapper(
+        google_api_key="YOUR_API_KEY",
+        google_cse_id="YOUR_CSE_ID"
+    )
+)
+
+# 执行搜索
+results = search.run("LangChain 1.0 新特性")
+print(results)
+
+# 或者使用 SerpAPI
+from langchain_community.utilities import SerpAPIWrapper
+
+search = SerpAPIWrapper(serpapi_key="YOUR_KEY")
+results = search.run("Python 最新版本")</code></pre>
+                </div>
+
+                <h3>数据库工具（SQLDatabaseToolkit）</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.utilities import SQLDatabase
+from langchain_community.toolkits import SQLDatabaseToolkit
+from langchain_openai import ChatOpenAI
+
+# 连接数据库
+db = SQLDatabase.from_uri(
+    "sqlite:///chinook.db"  # 或 PostgreSQL/MySQL 连接字符串
+)
+
+# 创建工具包
+llm = ChatOpenAI(model="gpt-4o")
+toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+
+# 获取所有可用工具
+tools = toolkit.get_tools()
+
+for tool in tools:
+    print(f"{tool.name}: {tool.description}")
+
+# 常用工具：
+# - sql_db_query: 执行 SQL 查询
+# - sql_db_schema: 获取数据库表结构
+# - sql_db_list_tables: 列出所有表
+# - sql_db_tables_schema: 获取多个表的结构
+
+# 执行查询
+query_tool = toolkit.get_tools()[0]
+result = query_tool.run("SELECT * FROM users LIMIT 5")
+print(result)</code></pre>
+                </div>
+
+                <h3>HTTP 请求工具</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.tools import (
+    RequestsGetTool,
+    RequestsPostTool
+)
+
+# GET 请求
+get_tool = RequestsGetTool()
+response = get_tool.run("https://api.github.com/repos/langchain-ai/langchain")
+print(response)
+
+# POST 请求
+post_tool = RequestsPostTool()
+response = post_tool.run({
+    "url": "https://api.example.com/data",
+    "data": {"key": "value"},
+    "headers": {"Content-Type": "application/json"}
+})
+print(response)</code></pre>
+                </div>
+
+                <h3>Shell 工具</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_community.tools import ShellTool
+
+shell_tool = ShellTool()
+
+# 执行 Shell 命令
+result = shell_tool.run("ls -la")
+print(result)
+
+# 多个命令
+result = shell_tool.run("cd /tmp && pwd && ls")</code></pre>
+                </div>
+
+                <div class="warning" data-label="安全警告">
+                    Shell 工具可以执行任意命令，生产环境使用时需要谨慎！建议限制可用命令或使用沙箱环境。
+                </div>
+
+                <h2>工具链组合</h2>
+
+                <p>使用 LCEL 将多个工具组合成链：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool
+from langchain_core.runnables import RunnableLambda
+
+@tool
+def validate_input(input_data: dict) -> dict:
+    """验证输入"""
+    if not input_data.get("query"):
+        raise ValueError("查询不能为空")
+    if len(input_data["query"]) > 100:
+        input_data["query"] = input_data["query"][:100]
+    return input_data
+
+@tool
+def search_tool(input_data: dict) -> str:
+    """执行搜索"""
+    return f"搜索 '{input_data['query']}' 的结果..."
+
+@tool
+def format_result(result: str) -> str:
+    """格式化结果"""
+    return f"=== 搜索结果 ===\n{result}\n=== 结束 ==="
+
+# 创建工具链
+tool_chain = (
+    validate_input
+    | search_tool
+    | format_result
+)
+
+# 执行链
+result = tool_chain.invoke({"query": "LangChain 教程"})
+print(result)</code></pre>
+                </div>
+
+                <pre class="mermaid">graph TD
+    A[输入] --> B{验证}
+    B -->|失败| C[返回错误]
+    B -->|成功| D[搜索工具]
+    D --> E[格式化]
+    E --> F[返回结果]</code></pre>
+
+                <h2>工具错误处理</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool
+from typing import Optional
+
+@tool
+def safe_divide(a: float, b: float) -> Optional[float]:
+    """安全的除法运算，处理除零错误"""
+    try:
+        return a / b
+    except ZeroDivisionError:
+        return None
+    except Exception as e:
+        return f"错误: {str(e)}"
+
+# 在 Agent 中使用工具时的错误处理
+from langchain_core.runnables import RunnableLambda
+
+def handle_tool_error(output):
+    """处理工具执行错误"""
+    if isinstance(output, Exception):
+        return f"工具执行失败: {str(output)}"
+    return output
+
+# 带错误处理的工具链
+safe_chain = (
+    safe_divide
+    | RunnableLambda(handle_tool_error)
+)
+
+result = safe_chain.invoke({"a": 10, "b": 0})
+print(result)  # "工具执行失败: division by zero"</code></pre>
+                </div>
+
+                <h2>结构化工具</h2>
+
+                <h3>StructuredTool</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
+
+class WeatherInput(BaseModel):
+    location: str = Field(..., description="城市名称")
+
+class WeatherOutput(BaseModel):
+    temperature: float
+    condition: str
+    humidity: int
+
+def get_weather_func(location: str) -> WeatherOutput:
+    """获取天气信息"""
+    import random
+    return WeatherOutput(
+        temperature=random.uniform(15, 35),
+        condition=random.choice(["晴", "多云", "雨"]),
+        humidity=random.randint(30, 80)
+    )
+
+# 创建结构化工具
+weather_tool = StructuredTool.from_function(
+    func=get_weather_func,
+    name="get_weather",
+    description="获取指定城市的天气信息",
+    args_schema=WeatherInput
+)
+
+# 使用
+result = weather_tool.invoke({"location": "北京"})
+print(f"温度: {result.temperature}°C")
+print(f"天气: {result.condition}")
+print(f"湿度: {result.humidity}%")</code></pre>
+                </div>
+
+                <h2>异步工具</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import asyncio
+from langchain_core.tools import tool
+
+# 异步工具
+@tool
+async def async_fetch(url: str) -> str:
+    """异步获取 URL 内容"""
+    import aiohttp
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
+
+# 批量异步调用
+async def fetch_multiple():
+    urls = [
+        "https://api.github.com/users/langchain-ai",
+        "https://api.github.com/users/openai"
+    ]
+    tasks = [async_fetch.invoke({"url": url}) for url in urls]
+    results = await asyncio.gather(*tasks)
+    return results
+
+# 运行
+results = asyncio.run(fetch_multiple())
+for result in results:
+    print(result)</code></pre>
+                </div>
+
+                <h2>工具调优技巧</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool
+
+# 1. 优化工具描述
+@tool
+def search_docs(query: str, category: str = "all") -> str:
+    """
+    在文档库中搜索相关信息。
+
+    使用场景：用户询问技术问题时使用此工具。
+    参数说明：
+    - query: 搜索关键词
+    - category: 文档类别（可选），默认搜索所有类别
+    """
+    # 搜索逻辑
+    return f"在 {category} 类别中搜索 '{query}' 的结果"
+
+# 2. 添加返回类型提示
+@tool
+def get_user_info(user_id: int) -> dict:
+    """获取用户信息，返回包含用户详细信息的字典"""
+    return {
+        "id": user_id,
+        "name": "用户名",
+        "email": "user@example.com"
+    }
+
+# 3. 使用缓存加速
+from functools import lru_cache
+
+@tool
+@lru_cache(maxsize=100)
+def cached_lookup(code: str) -> str:
+    """带缓存的查询工具"""
+    # 耗时查询
+    return f"查询 {code} 的结果"</code></pre>
+                </div>
+
+                <div class="tip" data-label="最佳实践">
+                    • 工具描述要清晰说明用途和使用场景<br>
+                    • 参数描述要详细，帮助 LLM 正确调用<br>
+                    • 对于耗时操作，添加缓存提高性能<br>
+                    • 合理使用异常处理，避免工具崩溃
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="05-agents.html" class="prev">← 智能体</a>
+                    <a href="07-memory.html" class="next">记忆管理 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. bind_tools() 方法的主要作用是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 创建新工具</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 将工具直接绑定到 LLM</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 验证工具参数</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 缓存工具结果</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. SQLDatabaseToolkit 的主要功能是什么？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 创建数据库</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 备份数据库</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 让 LLM 能与 SQL 数据库交互</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 加密数据库</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. 工具链中的错误应该在哪里处理？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 只在工具内部处理</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 只在 Agent 中处理</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 工具内部 + 链中的错误处理器</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 不需要处理</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全以下工具链的配置
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                            </div>
+                            <pre><code class="language-python">from langchain_core.tools import tool
+
+@tool
+def validate(data: dict) -> dict:
+    return data
+
+@tool
+def process(data: dict) -> str:
+    return "处理结果"
+
+# 创建工具链
+tool_chain = validate | ______
+result = tool_chain.invoke({"key": "value"})</code></pre>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看答案</summary>
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                                <code>process</code>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个工具链，包含：输入验证 → 数据查询 → 结果格式化
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_core.tools import tool
+from langchain_core.runnables import RunnableLambda
+
+@tool
+def validate_input(input_data: dict) -> dict:
+    """验证输入"""
+    if not input_data.get("user_id"):
+        raise ValueError("user_id 是必需的")
+    return input_data
+
+@tool
+def query_database(input_data: dict) -> dict:
+    """查询数据库"""
+    user_id = input_data["user_id"]
+    # 模拟数据库查询
+    return {
+        "user_id": user_id,
+        "name": "张三",
+        "email": "zhangsan@example.com",
+        "balance": 1000.50
+    }
+
+@tool
+def format_output(data: dict) -> str:
+    """格式化输出"""
+    return f"""
+    用户信息：
+    - ID: {data['user_id']}
+    - 姓名: {data['name']}
+    - 邮箱: {data['email']}
+    - 余额: ¥{data['balance']:.2f}
+    """
+
+# 创建工具链
+tool_chain = (
+    validate_input
+    | query_database
+    | format_output
+)
+
+# 使用
+result = tool_chain.invoke({"user_id": 123})
+print(result)</code></pre>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你需要为一个企业设计工具系统，允许 LLM 安全地执行文件操作和 Shell 命令，如何设计？
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考方案</summary>
+                            <div style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                                <strong>方案要点：</strong>
+                                <ul>
+                                    <li><strong>输入验证</strong>：严格验证文件路径，防止路径遍历攻击</li>
+                                    <li><strong>白名单机制</strong>：只允许执行预定义的安全命令</li>
+                                    <li><strong>沙箱环境</strong>：使用 Docker 或 chroot 隔离执行环境</li>
+                                    <li><strong>权限限制</strong>：使用最小权限原则运行工具</li>
+                                    <li><strong>审计日志</strong>：记录所有工具调用，便于审查</li>
+                                    <li><strong>超时控制</strong>：设置工具执行超时，防止资源耗尽</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            7. ShellTool 执行命令失败时，应该如何处理？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 忽略错误</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">B. 重试直到成功</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">C. 捕获异常并返回友好的错误信息</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 终止程序</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            8. 创建一个邮件发送工具，使用 Pydantic 进行参数验证
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_core.tools import tool
+from pydantic import BaseModel, Field, EmailStr
+from typing import List
+
+class EmailInput(BaseModel):
+    """邮件输入参数"""
+    to: List[EmailStr] = Field(..., description="收件人邮箱列表")
+    subject: str = Field(..., min_length=1, max_length=200, description="邮件主题")
+    body: str = Field(..., description="邮件正文")
+    cc: List[EmailStr] = Field(default=[], description="抄送列表")
+
+@tool(args_schema=EmailInput)
+def send_email(input: EmailInput) -> str:
+    """
+    发送邮件给指定收件人。
+
+    参数：
+    - to: 收件人邮箱（支持多个）
+    - subject: 邮件主题
+    - body: 邮件正文
+    - cc: 抄送列表（可选）
+    """
+    # 实际应用中调用邮件服务 API
+    recipients = ", ".join(input.to)
+    cc_list = ", ".join(input.cc) if input.cc else "无"
+
+    return f"""
+    邮件已发送！
+    收件人: {recipients}
+    抄送: {cc_list}
+    主题: {input.subject}
+    正文长度: {len(input.body)} 字符
+    """
+
+# 使用
+result = send_email.invoke({
+    "to": ["user1@example.com", "user2@example.com"],
+    "subject": "重要通知",
+    "body": "这是一封测试邮件。",
+    "cc": ["manager@example.com"]
+})
+print(result)</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

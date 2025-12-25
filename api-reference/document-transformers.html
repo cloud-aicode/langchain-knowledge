@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档转换器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-document-transformers">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>文档转换器 API</h1>
+                <p class="subtitle">DocumentTransformer 与文档处理</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#transformers" class="api-nav-link">转换器类型</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>文档转换器对加载的文档进行转换，如去重、压缩、元数据提取等操作。</p>
+
+                <pre class="mermaid">graph TD
+                    A[DocumentTransformer] --> B[Html2TextTransformer]
+    A --> C[BeautifulSoupTransformer]
+    A --> D[DoctypeMetadataTransformer]
+    A --> E[EmbeddingsRedundantFilter]
+
+    A --> F[嵌入相关]
+    F --> G[EmbeddingsClusteringFilter]
+    F --> H[EmbeddingsMaxMarginalRelevanceExtraFilter]
+
+    style A fill:#e1f5fe
+    style E fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">DocumentTransformer</h3>
+                    <p class="api-description">文档转换器抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.documents.transformers import DocumentTransformer
+
+class DocumentTransformer(ABC):
+    """文档转换器基类"""
+
+    @abstractmethod
+    def transform_documents(
+        self,
+        documents: Sequence[Document],
+        **kwargs: Any,
+    ) -> Sequence[Document]:
+        """
+        转换文档列表
+
+        Args:
+            documents: 文档列表
+            **kwargs: 额外参数
+
+        Returns:
+            转换后的文档列表
+        """
+
+    async def atransform_documents(
+        self,
+        documents: Sequence[Document],
+        **kwargs: Any,
+    ) -> Sequence[Document]:
+        """
+        异步转换文档列表
+
+        默认调用 transform_documents
+        """
+        return await asyncio.to_thread(
+            self.transform_documents, documents, **kwargs
+        )</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="transformers">转换器类型</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">Html2TextTransformer</h3>
+                    <p class="api-description">HTML 转纯文本。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import Html2TextTransformer
+
+class Html2TextTransformer(DocumentTransformer):
+    """HTML 转文本转换器"""
+
+    def __init__(
+        self,
+        ignore_links: bool = False,
+        ignore_images: bool = False,
+        body_width: int = 0,
+        ignore_emphasis: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            ignore_links: 是否忽略链接
+            ignore_images: 是否忽略图片
+            body_width: 行宽限制（0=不限制）
+            ignore_emphasis: 是否忽略强调（粗体/斜体）
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import Html2TextTransformer
+from langchain_core.documents import Document
+
+transformer = Html2TextTransformer()
+
+html_content = """
+<html>
+    <body>
+        <h1>标题</h1>
+        <p>这是段落内容</p>
+    </body>
+</html>
+"""
+
+documents = [Document(page_content=html_content)]
+transformed = transformer.transform_documents(documents)
+
+print(transformed[0].page_content)
+# "标题\n\n这是段落内容"</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">BeautifulSoupTransformer</h3>
+                    <p class="api-description">BeautifulSoup HTML 转换器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import BeautifulSoupTransformer
+
+class BeautifulSoupTransformer(DocumentTransformer):
+    """BeautifulSoup 转换器"""
+
+    def __init__(
+        self,
+        tags_to_extract: List[str] = ["p"],
+        strip_tags: Optional[List[str]] = None,
+        remove_lines: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            tags_to_extract: 要提取的标签
+            strip_tags: 要移除的标签
+            remove_lines: 是否移除空行
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import BeautifulSoupTransformer
+
+# 提取特定标签
+transformer = BeautifulSoupTransformer(
+    tags_to_extract=["h1", "h2", "p"]
+)
+
+html = """
+<h1>主标题</h1>
+<p>段落1</p>
+<p>段落2</p>
+"""
+
+docs = [Document(page_content=html)]
+transformed = transformer.transform_documents(docs)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">DoctypeMetadataTransformer</h3>
+                    <p class="api-description">添加文档类型元数据。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import DoctypeMetadataTransformer
+
+class DoctypeMetadataTransformer(DocumentTransformer):
+    """文档类型元数据转换器"""
+
+    def __init__(
+        self,
+        doctype: str = "",
+    ):
+        """
+        初始化
+
+        Args:
+            doctype: 文档类型标识
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import DoctypeMetadataTransformer
+
+transformer = DoctypeMetadataTransformer(doctype="pdf")
+
+docs = [Document(page_content="内容")]
+transformed = transformer.transform_documents(docs)
+
+print(transformed[0].metadata)
+# {"doctype": "pdf"}</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">EmbeddingsRedundantFilter</h3>
+                    <p class="api-description">基于嵌入的去重过滤器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import EmbeddingsRedundantFilter
+
+class EmbeddingsRedundantFilter(DocumentTransformer):
+    """嵌入去重过滤器"""
+
+    def __init__(
+        self,
+        embeddings: Embeddings,
+        similarity_threshold: float = 0.95,
+    ):
+        """
+        初始化
+
+        Args:
+            embeddings: 嵌入模型
+            similarity_threshold: 相似度阈值（高于此值视为重复）
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
+
+transformer = EmbeddingsRedundantFilter(
+    embeddings=embeddings,
+    similarity_threshold=0.9  # 90% 相似度视为重复
+)
+
+docs = [
+    Document(page_content="Python 是一种编程语言"),
+    Document(page_content="Python 是编程语言"),  # 重复
+    Document(page_content="Java 也是一种编程语言")
+]
+
+unique_docs = transformer.transform_documents(docs)
+print(f"原始: {len(docs)}, 去重后: {len(unique_docs)}")
+# 3 -> 2</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">EmbeddingsClusteringFilter</h3>
+                    <p class="api-description">基于嵌入聚类的选择器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import EmbeddingsClusteringFilter
+
+class EmbeddingsClusteringFilter(DocumentTransformer):
+    """嵌入聚类过滤器"""
+
+    def __init__(
+        self,
+        embeddings: Embeddings,
+        num_clusters: int = 5,
+        num_closest: int = 1,
+    ):
+        """
+        初始化
+
+        Args:
+            embeddings: 嵌入模型
+            num_clusters: 聚类数量
+            num_closest: 每个聚类选择的最接近数量
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import EmbeddingsClusteringFilter
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
+
+transformer = EmbeddingsClusteringFilter(
+    embeddings=embeddings,
+    num_clusters=3,      # 分成 3 组
+    num_closest=2        # 每组选 2 个
+)
+
+# 从大量文档中选择代表性样本
+docs = [Document(page_content=f"文档 {i}") for i in range(100)]
+selected = transformer.transform_documents(docs)
+print(f"选择: {len(selected)}")  # 6 (3 * 2)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">LongContextReorder</h3>
+                    <p class="api-description">长上下文重排序（优化检索结果）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_community.document_transformers import LongContextReorder
+
+class LongContextReorder(DocumentTransformer):
+    """长上下文重排序
+
+    将最相关的文档放在开头和结尾，
+    不太相关的放在中间（利用 LLM 的注意力模式）
+    """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_community.document_transformers import LongContextReorder
+
+reorder = LongContextReorder()
+
+docs = [
+    Document(page_content="相关文档 1", metadata={"score": 0.95}),
+    Document(page_content="相关文档 2", metadata={"score": 0.90}),
+    Document(page_content="不太相关", metadata={"score": 0.50}),
+    Document(page_content="最相关", metadata={"score": 0.99})
+]
+
+# 重排序后：最相关在前，次相关在后
+reordered = reorder.transform_documents(docs)</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">NMFITextSplitter</h3>
+                    <p class="api-description">非负矩阵分解文本分割器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_experimental.text_splitter import NMFITextSplitter
+
+class NMFITextSplitter(DocumentTransformer):
+    """NMI 文本分割器（用于文档分块）"""</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 链式转换 ==========
+from langchain_community.document_transformers import (
+    Html2TextTransformer,
+    DoctypeMetadataTransformer
+)
+
+# 转换管道
+transformers = [
+    Html2TextTransformer(),
+    DoctypeMetadataTransformer(doctype="html")
+]
+
+docs = [Document(page_content="<html>...</html>")]
+
+for transformer in transformers:
+    docs = transformer.transform_documents(docs)
+
+# ========== 示例2: 与加载器集成 ==========
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_transformers import Html2TextTransformer
+
+# 加载并转换
+loader = WebBaseLoader("https://example.com")
+docs = loader.load()
+
+transformer = Html2TextTransformer()
+clean_docs = transformer.transform_documents(docs)
+
+# ========== 示例3: 去重管道 ==========
+from langchain_community.document_transformers import (
+    Html2TextTransformer,
+    EmbeddingsRedundantFilter
+)
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
+
+pipeline = [
+    Html2TextTransformer(),
+    EmbeddingsRedundantFilter(embeddings, similarity_threshold=0.9)
+]
+
+# ========== 示例4: 自定义转换器 ==========
+from langchain_core.documents.transformers import DocumentTransformer
+
+class UppercaseTransformer(DocumentTransformer):
+    def transform_documents(self, documents):
+        for doc in documents:
+            doc.page_content = doc.page_content.upper()
+        return documents
+
+transformer = UppercaseTransformer()
+docs = transformer.transform_documents([
+    Document(page_content="hello world")
+])
+# "HELLO WORLD"</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="document-loaders.html">Document Loaders API</a></li>
+                    <li><a href="text-splitters.html">Text Splitters API</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="output-parsers.html">← Output Parsers API</a>
+                    <a href="callbacks.html" class="next">Callbacks API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

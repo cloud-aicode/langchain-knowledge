@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输出解析 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-output-parsers">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>输出解析</h1>
+                <p class="subtitle">将 LLM 的输出转换为结构化数据</p>
+
+                <h2>为什么需要输出解析？</h2>
+                <p>LLM 默认输出的是纯文本，但在实际应用中，我们经常需要结构化数据：</p>
+                <ul>
+                    <li><strong>数据库操作</strong>：需要提取 SQL 查询参数</li>
+                    <li><strong>API 调用</strong>：需要解析 JSON 格式的参数</li>
+                    <li><strong>数据录入</strong>：需要提取特定字段（姓名、日期、金额等）</li>
+                    <li><strong>条件判断</strong>：需要根据输出执行不同操作</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    输出解析器就像一个"翻译官"——把 LLM 的自然语言输出翻译成你的程序可以理解和使用的数据格式。
+                </div>
+
+                <h2>输出解析流程</h2>
+
+                <pre class="mermaid">graph LR
+    A[用户输入] --> B[LLM 处理]
+    B --> C[原始文本输出]
+    C --> D[Output Parser]
+    D --> E[结构化数据]
+    E --> F[应用使用]
+
+    D --> G{解析类型?}
+    G -->|JSON| H[PydanticOutputParser]
+    G -->|列表| I[CommaSeparatedListOutputParser]
+    G -->|自定义| J[自定义 Parser]
+
+    style D fill:#fff9c4
+    style E fill:#c8e6c9</code></pre>
+
+                <h2>PydanticOutputParser（JSON 解析）</h2>
+                <p>最常用的解析器，将 LLM 输出解析为 JSON 对象：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+# 1. 定义输出数据模型
+class Person(BaseModel):
+    """人物信息"""
+    name: str = Field(description="人物姓名")
+    age: int = Field(description="人物年龄")
+    occupation: str = Field(description="职业")
+    skills: list[str] = Field(description="技能列表")
+
+# 2. 创建解析器
+parser = PydanticOutputParser(pydantic_object=Person)
+
+# 3. 查看解析器生成的格式说明
+print("格式说明:")
+print(parser.get_format_instructions())
+# 输出类似：
+# The output should be formatted as a JSON instance that conforms to the JSON schema below...
+# {"name": "...", "age": ..., "occupation": "...", "skills": [...]}
+
+# 4. 创建提示模板（包含格式说明）
+prompt = PromptTemplate(
+    template="分析以下文本，提取人物信息。\n\n{format_instructions}\n\n文本内容：{text}\n\n",
+    input_variables=["text"],
+    partial_variables={"format_instructions": parser.get_format_instructions()}
+)
+
+# 5. 构建链并执行
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+chain = prompt | llm | parser
+
+# 6. 执行
+text = "张三今年28岁，是一名软件工程师，擅长Python、JavaScript和机器学习。"
+result = chain.invoke({"text": text})
+
+print(f"姓名: {result.name}")
+print(f"年龄: {result.age}")
+print(f"职业: {result.occupation}")
+print(f"技能: {result.skills}")
+# 姓名: 张三
+# 年龄: 28
+# 职业: 软件工程师
+# 技能: ['Python', 'JavaScript', '机器学习']</code></pre>
+                </div>
+
+                <div class="note" data-label="注意">
+                    <code>PydanticOutputParser</code> 会自动在提示中添加格式说明，并处理 LLM 输出中的 JSON 解析错误。
+                </div>
+
+                <h2>处理复杂嵌套结构</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from typing import List
+from pydantic import BaseModel, Field
+
+class Address(BaseModel):
+    """地址信息"""
+    street: str = Field(description="街道地址")
+    city: str = Field(description="城市")
+    country: str = Field(description="国家")
+
+class Company(BaseModel):
+    """公司信息"""
+    name: str = Field(description="公司名称")
+    industry: str = Field(description="行业")
+    employee_count: int = Field(description="员工数量")
+
+class UserProfile(BaseModel):
+    """用户完整资料"""
+    user_id: str = Field(description="用户ID")
+    username: str = Field(description="用户名")
+    email: str = Field(description="电子邮箱")
+    address: Address = Field(description="地址信息")
+    companies: List[Company] = Field(description="工作经历")
+
+# 解析复杂嵌套结构
+parser = PydanticOutputParser(pydantic_object=UserProfile)
+
+# 使用示例
+text = """
+用户ID: USER12345
+用户名: tech_master
+邮箱: master@example.com
+
+地址: 北京市海淀区中关村大街1号，中国
+
+工作经历:
+1. 腾讯 - 互联网 - 50000人
+2. 字节跳动 - 互联网 - 100000人
+"""
+
+chain = prompt | llm | parser
+result = chain.invoke({"text": text})
+
+print(result.model_dump_json(indent=2))
+# {
+#   "user_id": "USER12345",
+#   "username": "tech_master",
+#   "email": "master@example.com",
+#   "address": {
+#     "street": "中关村大街1号",
+#     "city": "北京市",
+#     "country": "中国"
+#   },
+#   "companies": [...]
+# }</code></pre>
+                </div>
+
+                <h2>CommaSeparatedListOutputParser</h2>
+                <p>解析逗号分隔的列表：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.output_parsers import CommaSeparatedListOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+# 1. 创建列表解析器
+parser = CommaSeparatedListOutputParser()
+
+# 2. 获取格式说明
+format_instructions = parser.get_format_instructions()
+print(format_instructions)
+# 输出：Your response should be a list of comma separated values, eg: `foo, bar, baz`
+
+# 3. 创建提示
+prompt = PromptTemplate(
+    template="列出以下主题相关的5个关键词。\n\n{format_instructions}\n\n主题：{topic}",
+    input_variables=["topic"],
+    partial_variables={"format_instructions": format_instructions}
+)
+
+# 4. 构建链
+chain = prompt | ChatOpenAI(temperature=0) | parser
+
+# 5. 执行
+result = chain.invoke({"topic": "人工智能"})
+print(result)
+# 输出：['机器学习', '深度学习', '自然语言处理', '计算机视觉', '强化学习']
+
+# 可以直接作为列表使用
+for keyword in result:
+    print(f"- {keyword}")</code></pre>
+                </div>
+
+                <h2>StructuredOutputParser</h2>
+                <p>另一种结构化输出方式，使用 ResponseSchema：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.output_parsers import StructuredOutputParser, ResponseSchema
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+# 1. 定义响应模式
+response_schemas = [
+    ResponseSchema(
+        name="summary",
+        description="文本内容的简要摘要，不超过50字"
+    ),
+    ResponseSchema(
+        name="keywords",
+        description="从文本中提取的关键词列表"
+    ),
+    ResponseSchema(
+        name="sentiment",
+        description="文本的情感倾向（正面/负面/中性）"
+    )
+]
+
+# 2. 创建解析器
+parser = StructuredOutputParser.from_response_schemas(response_schemas)
+
+# 3. 创建提示
+prompt = PromptTemplate(
+    template="分析以下文本：\n\n{text}\n\n{format_instructions}",
+    input_variables=["text"],
+    partial_variables={"format_instructions": parser.get_format_instructions()}
+)
+
+# 4. 构建链
+chain = prompt | ChatOpenAI(temperature=0) | parser
+
+# 5. 执行
+text = "今天天气真不错，阳光明媚，心情特别好！决定出去散步。"
+result = chain.invoke({"text": text})
+
+print(result)
+# 输出：
+# {
+#   'summary': '描述了好天气带来的愉快心情',
+#   'keywords': ['天气', '阳光', '心情', '散步'],
+#   'sentiment': '正面'
+# }</code></pre>
+                </div>
+
+                <h2>自定义 Output Parser</h2>
+                <p>当内置解析器无法满足需求时，可以创建自定义解析器：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.outputs import Generation
+from langchain_core.exceptions import OutputParserException
+from langchain_core.output_parsers import BaseOutputParser
+
+# 自定义解析器：提取日期
+class DateExtractorParser(BaseOutputParser):
+    """从文本中提取日期信息"""
+
+    def parse(self, text: str) -> dict:
+        """解析 LLM 输出"""
+        import re
+        from datetime import datetime
+
+        # 匹配常见日期格式
+        date_patterns = [
+            r'\d{4}-\d{2}-\d{2}',  # 2024-01-15
+            r'\d{4}年\d{1,2}月\d{1,2}日',  # 2024年1月15日
+            r'\d{1,2}/\d{1,2}/\d{4}',  # 1/15/2024
+        ]
+
+        dates = []
+        for pattern in date_patterns:
+            matches = re.findall(pattern, text)
+            dates.extend(matches)
+
+        return {
+            "dates_found": dates,
+            "count": len(dates)
+        }
+
+    def get_format_instructions(self) -> str:
+        """返回格式说明"""
+        return "请从文本中提取所有日期信息，包括具体日期。"
+
+# 使用自定义解析器
+parser = DateExtractorParser()
+
+# 方法1：直接解析文本
+text = "会议安排在2024年3月15日，另一个会议是2024-04-20"
+result = parser.parse(text)
+print(result)
+# {'dates_found': ['2024年3月15日', '2024-04-20'], 'count': 2}
+
+# 方法2：与 LLM 集成
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+prompt = PromptTemplate(
+    template="从以下文本中提取所有日期：\n\n{text}",
+    input_variables=["text"]
+)
+
+chain = prompt | ChatOpenAI() | parser
+result = chain.invoke({"text": text})
+print(result)</code></pre>
+                </div>
+
+                <h2>带错误处理的解析器</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.output_parsers import OutputFixingParser
+from langchain_openai import ChatOpenAI
+
+# 当解析失败时，自动让 LLM 修正输出
+base_parser = PydanticOutputParser(pydantic_object=Person)
+
+# 创建修复解析器
+fixing_parser = OutputFixingParser.from_llm(
+    parser=base_parser,
+    llm=ChatOpenAI(model="gpt-4")
+)
+
+# 即使 LLM 输出格式有问题，也会自动修正
+bad_llm_output = "姓名：张三，年龄：28岁"
+
+try:
+    # base_parser 会失败
+    result = base_parser.parse(bad_llm_output)
+except Exception as e:
+    print(f"基础解析器失败: {e}")
+
+# fixing_parser 会自动修正
+result = fixing_parser.parse(bad_llm_output)
+print(f"修复后结果: {result}")</code></pre>
+                </div>
+
+                <h2>与流式输出结合</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.output_parsers import JsonOutputParser
+
+# JsonOutputParser 支持流式处理
+parser = JsonOutputParser()
+
+# 构建链
+chain = prompt | ChatOpenAI() | parser
+
+# 流式输出
+for chunk in chain.stream({"text": "..."}):
+    print(chunk, end="", flush=True)
+# 逐块输出解析后的 JSON</code></pre>
+                </div>
+
+                <h2>输出解析器选择决策树</h2>
+
+                <pre class="mermaid">graph TD
+    A[需要什么输出格式?] --> B{数据类型?}
+    B -->|JSON对象| C[PydanticOutputParser]
+    B -->|简单列表| D[CommaSeparatedListOutputParser]
+    B -->|键值对| E[StructuredOutputParser]
+    B -->|自定义| F[自定义 Parser]
+
+    C --> C1{需要验证?}
+    C1 -->|是| C2[使用 Pydantic 模型]
+    C1 -->|否| C3[JsonOutputParser]
+
+    F --> F1{复杂度?}
+    F1 -->|简单| F2[继承 BaseOutputParser]
+    F1 -->|需要修复| F3[OutputFixingParser]
+
+    style C fill:#c8e6c9
+    style F3 fill:#fff9c4</code></pre>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 选择合适的解析器</h3>
+                    <ul>
+                        <li>JSON 对象：使用 <code>PydanticOutputParser</code></li>
+                        <li>简单列表：使用 <code>CommaSeparatedListOutputParser</code></li>
+                        <li>自定义字段：使用 <code>StructuredOutputParser</code></li>
+                    </ul>
+
+                    <h3>2. 提供清晰的格式说明</h3>
+                    <ul>
+                        <li>在提示中明确说明期望的输出格式</li>
+                        <li>提供示例（Few-shot）帮助 LLM 理解</li>
+                        <li>使用 <code>get_format_instructions()</code> 获取标准说明</li>
+                    </ul>
+
+                    <h3>3. 处理解析错误</h3>
+                    <ul>
+                        <li>使用 <code>OutputFixingParser</code> 自动修复</li>
+                        <li>添加重试逻辑</li>
+                        <li>记录解析失败的案例用于调试</li>
+                    </ul>
+
+                    <h3>4. 优化字段描述</h3>
+                    <ul>
+                        <li>在 <code>Field</code> 中提供详细的描述信息</li>
+                        <li>说明数据类型和约束条件</li>
+                        <li>给出示例值</li>
+                    </ul>
+
+                    <h3>5. 性能考虑</h3>
+                    <ul>
+                        <li>Pydantic 解析有轻微性能开销</li>
+                        <li>简单场景可用 <code>JsonOutputParser</code></li>
+                        <li>流式场景使用流式解析器</li>
+                    </ul>
+                </div>
+
+                <h2>常见问题</h2>
+
+                <div class="warning" data-label="问题：解析失败">
+                    <strong>问题</strong>：LLM 输出不是有效的 JSON 格式。
+                    <br><br>
+                    <strong>解决</strong>：
+                    <ul>
+                        <li>使用 <code>OutputFixingParser</code> 自动修复</li>
+                        <li>在提示中强调 JSON 格式要求</li>
+                        <li>提供 Few-shot 示例</li>
+                    </ul>
+                </div>
+
+                <div class="warning" data-label="问题：字段缺失">
+                    <strong>问题</strong>：解析后的 JSON 缺少某些字段。
+                    <br><br>
+                    <strong>解决</strong>：
+                    <ul>
+                        <li>在 Field 描述中强调该字段是必需的</li>
+                        <li>使用 <code>Field(default=...)</code> 提供默认值</li>
+                        <li>在提示中明确要求返回所有字段</li>
+                    </ul>
+                </div>
+
+                <div class="warning" data-label="问题：类型不匹配">
+                    <strong>问题</strong>：应该返回数字但返回了字符串。
+                    <br><br>
+                    <strong>解决</strong>：
+                    <ul>
+                        <li>在 Field 描述中明确数据类型</li>
+                        <li>提供具体的示例值</li>
+                        <li>考虑使用自定义后处理进行类型转换</li>
+                    </ul>
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 哪个解析器最适合将 LLM 输出解析为 Pydantic 模型？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. CommaSeparatedListOutputParser</div>
+                            <div class="option correct-option">B. PydanticOutputParser</div>
+                            <div class="option">C. StructuredOutputParser</div>
+                            <div class="option">D. JsonOutputParser</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 当 LLM 输出格式可能有问题时，应该使用哪个解析器？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. PydanticOutputParser</div>
+                            <div class="option correct-option">B. OutputFixingParser</div>
+                            <div class="option">C. CommaSeparatedListOutputParser</div>
+                            <div class="option">D. 自定义解析器</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            3. 补全代码：创建一个解析器来提取文章信息
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">from pydantic import BaseModel, Field
+
+class Article(BaseModel):
+    title: str = Field(description="文章标题")
+    author: str = Field(description="作者")
+    word_count: int = Field(description="字数")
+    tags: list[str] = Field(description="标签")
+
+parser = ______(pydantic_object=Article)
+instructions = parser.____()</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            4. 创建一个自定义解析器，从文本中提取所有邮件地址
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            5. 你正在构建一个客服机器人，需要将用户查询分类为"技术支持"、"账单问题"、"产品咨询"三类，并提取优先级。你会如何设计输出解析？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="08-text-splitters.html">← 上一章：文本分割</a>
+                    <a href="10-memory.html" class="next">下一章：记忆管理 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

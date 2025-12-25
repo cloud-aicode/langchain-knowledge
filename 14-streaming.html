@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流式处理 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-streaming">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>流式处理</h1>
+                <p class="subtitle">实时输出 LLM 响应，提升用户体验</p>
+
+                <h2>为什么需要流式输出？</h2>
+                <p>传统 LLM 调用需要等待完整响应生成，这可能需要几秒到几十秒。流式输出让内容逐字符（或逐 token）实时显示：</p>
+                <ul>
+                    <li><strong>更好的用户体验</strong>：用户立即看到输出，感觉响应更快</li>
+                    <li><strong>更低的延迟感</strong>：首字延迟（TTFF）比完整响应时间短得多</li>
+                    <li><strong>实时交互</strong>：可以在生成过程中根据用户反馈调整</li>
+                    <li><strong>长输出友好</strong>：生成长文本时用户不会一直等待</li>
+                </ul>
+
+                <div class="tip" data-label="提示">
+                    流式输出就像看直播视频——内容一边生成一边播放，而不是等整个视频下载完成后再观看。
+                </div>
+
+                <h2>流式处理架构</h2>
+
+                <pre class="mermaid">graph LR
+    A[用户输入] --> B[LLM 开始生成]
+    B --> C[Token 1]
+    C --> D[Token 2]
+    D --> E[Token 3]
+    E --> F[...更多 Token]
+    F --> G[最终 Token]
+
+    C --> H[实时显示]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+
+    style H fill:#c8e6c9</code></pre>
+
+                <h2>基础流式输出</h2>
+
+                <h3>同步流式输出</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+# 创建支持流式的 LLM
+llm = ChatOpenAI(model="gpt-4o")
+
+# 方法1：使用 stream() 方法
+print("流式输出: ")
+for chunk in llm.stream("讲一个关于 Python 的简短故事"):
+    # 每个 chunk 是一个 AIMessageChunk
+    print(chunk.content, end="", flush=True)
+
+print("\n\n完成!")
+
+# 方法2：使用 invoke + streaming config
+from langchain_core.callbacks import StdOutCallbackHandler
+
+# 这会打印每个 token
+response = llm.invoke(
+    "讲一个关于 Python 的简短故事",
+    config={"callbacks": [StdOutCallbackHandler()]}
+)</code></pre>
+                </div>
+
+                <h3>异步流式输出</h3>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">import asyncio
+from langchain_openai import AsyncChatOpenAI
+
+async def stream_example():
+    # 创建异步 LLM
+    llm = AsyncChatOpenAI(model="gpt-4o")
+
+    print("异步流式输出:")
+    async for chunk in llm.astream("用三句话介绍人工智能"):
+        print(chunk.content, end="", flush=True)
+
+    print("\n\n完成!")
+
+# 运行
+asyncio.run(stream_example())</code></pre>
+                </div>
+
+                <h2>在链中使用流式输出</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+# 创建链
+prompt = ChatPromptTemplate.from_template("讲一个关于{topic}的简短故事")
+llm = ChatOpenAI(model="gpt-4o")
+chain = prompt | llm
+
+# 流式执行链
+print("链式流式输出:\n")
+for chunk in chain.stream({"topic": "量子计算"}):
+    # chunk 是 AIMessageChunk
+    print(chunk.content, end="", flush=True)
+
+print("\n完成!")
+
+# 也可以使用 astream (异步)
+async def stream_chain():
+    async for chunk in chain.astream({"topic": "区块链"}):
+        print(chunk.content, end="", flush=True)
+
+asyncio.run(stream_chain())</code></pre>
+                </div>
+
+                <h2>流式输出的数据结构</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 查看流式输出的 chunk 结构
+for chunk in llm.stream("你好"):
+    print(f"内容: {repr(chunk.content)}")
+    print(f"类型: {type(chunk)}")
+    print(f"是否有响应元数据: {chunk.response_metadata}")
+    print(f"ID: {chunk.id}")
+    print("---")
+
+# 输出示例:
+# 内容: '你'
+# 类型: <class 'langchain_core.messages.ai.AIMessageChunk'>
+# 响应元数据: {...}
+# ID: 'chatcmpl-...'
+# ---
+# 内容: '好'
+# ---</code></pre>
+                </div>
+
+                <h2>处理流式输出的 Token 累积</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 方式1：简单累积
+full_response = ""
+for chunk in llm.stream("用三句话介绍机器学习"):
+    full_response += chunk.content
+    print(chunk.content, end="", flush=True)
+
+print(f"\n\n完整响应长度: {len(full_response)} 字符")
+
+# 方式2：使用累加器（更安全）
+from langchain_core.messages import AIMessageChunk
+
+accumulated_message = None
+for chunk in llm.stream("用三句话介绍深度学习"):
+    if accumulated_message is None:
+        accumulated_message = chunk
+    else:
+        accumulated_message = accumulated_message + chunk
+
+print(f"\n完整内容:\n{accumulated_message.content}")
+
+# 方式3：获取完整响应后继续处理
+stream = llm.stream("列出 Python 的5个特性")
+
+# 收集所有 chunks
+chunks = []
+for chunk in stream:
+    chunks.append(chunk)
+    print(chunk.content, end="", flush=True)
+
+# 合并获取完整消息
+full_message = chunks[0]
+for chunk in chunks[1:]:
+    full_message = full_message + chunk
+
+print(f"\n\nToken 使用: {full_message.response_metadata.get('token_usage', {})}")</code></pre>
+                </div>
+
+                <h2>流式输出与状态管理</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from typing import AsyncIterator
+
+class StreamingChat:
+    """支持流式输出的聊天类"""
+
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4o")
+        self.history = []
+
+    async def astream_chat(self, message: str) -> AsyncIterator[str]:
+        """异步流式聊天"""
+        # 添加用户消息到历史
+        self.history.append({"role": "user", "content": message})
+
+        # 构建完整上下文
+        context = "\n".join([
+            f"{msg['role']}: {msg['content']}"
+            for msg in self.history
+        ])
+
+        # 流式生成响应
+        full_response = ""
+        async for chunk in self.llm.astream(context):
+            content = chunk.content
+            full_response += content
+            yield content
+
+        # 添加助手响应到历史
+        self.history.append({"role": "assistant", "content": full_response})
+
+    def get_history(self):
+        """获取对话历史"""
+        return self.history
+
+# 使用示例
+async def chat_example():
+    chat = StreamingChat()
+
+    print("助手: ", end="")
+    async for token in chat.astream_chat("你好！"):
+        print(token, end="", flush=True)
+    print()
+
+    print("助手: ", end="")
+    async for token in chat.astream_chat("你刚才说了什么？"):
+        print(token, end="", flush=True)
+    print()
+
+    # 查看历史
+    import json
+    print("\n对话历史:")
+    print(json.dumps(chat.get_history(), ensure_ascii=False, indent=2))
+
+asyncio.run(chat_example())</code></pre>
+                </div>
+
+                <h2>流式输出时序图</h2>
+
+                <pre class="mermaid">sequenceDiagram
+    participant Client
+    participant LangChain
+    participant LLM
+
+    Client->>LangChain: stream("...")
+    LangChain->>LLM: 发起请求
+
+    loop 每个 Token
+        LLM-->>LangChain: Token chunk
+        LangChain-->>Client: yield chunk
+        Client->>Client: 更新 UI
+    end
+
+    LLM-->>LangChain: 完成
+    LangChain-->>Client: 流结束
+
+    Note over Client: 整个过程中用户<br/>看到内容逐字出现</code></pre>
+
+                <h2>与 FastAPI 集成</h2>
+                <p>在 Web 应用中使用流式输出：</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from langchain_openai import ChatOpenAI
+import asyncio
+
+app = FastAPI()
+llm = ChatOpenAI(model="gpt-4o")
+
+async def generate_stream(prompt: str):
+    """生成流式响应"""
+    async for chunk in llm.astream(prompt):
+        # 发送每个 chunk
+        yield chunk.content
+
+@app.get("/chat")
+async def chat_endpoint(message: str):
+    """流式聊天端点"""
+    return StreamingResponse(
+        generate_stream(message),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"  # 禁用 Nginx 缓冲
+        }
+    )
+
+# 使用 SSE (Server-Sent Events) 格式
+async def generate_sse(prompt: str):
+    """生成 SSE 格式的流"""
+    async for chunk in llm.astream(prompt):
+        # SSE 格式: data: <content>\n\n
+        yield f"data: {chunk.content}\n\n"
+
+    # 发送结束标记
+    yield "data: [DONE]\n\n"
+
+@app.get("/chat/sse")
+async def chat_sse_endpoint(message: str):
+    """SSE 流式聊天端点"""
+    return StreamingResponse(
+        generate_sse(message),
+        media_type="text/event-stream"
+    )</code></pre>
+                </div>
+
+                <h2>前端 SSE 接收示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">javascript</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-javascript">// 使用 JavaScript 接收 SSE 流
+async function streamChat(message) {
+    const response = await fetch(`/chat/sse?message=${encodeURIComponent(message)}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    const outputElement = document.getElementById('output');
+    outputElement.textContent = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                    return;
+                }
+                outputElement.textContent += data;
+                // 自动滚动到底部
+                outputElement.scrollTop = outputElement.scrollHeight;
+            }
+        }
+    }
+}
+
+// 使用示例
+streamChat('讲一个关于 Python 的故事');</code></pre>
+                </div>
+
+                <h2>流式输出的常见模式</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 模式1：带前缀的流式输出
+async def stream_with_prefix():
+    prefix = "助手: "
+    print(prefix, end="", flush=True)
+
+    async for chunk in llm.astream("你好"):
+        print(chunk.content, end="", flush=True)
+
+    print()  # 换行
+
+# 模式2：流式输出到文件
+async def stream_to_file():
+    with open("output.txt", "w", encoding="utf-8") as f:
+        async for chunk in llm.astream("写一首关于春天的诗"):
+            # 同时写入文件和控制台
+            f.write(chunk.content)
+            print(chunk.content, end="", flush=True)
+
+# 模式3：分批流式输出（每 N 个 token 刷新一次）
+async def stream_in_batches(batch_size=5):
+    batch = []
+    async for chunk in llm.astream("详细介绍 LangChain"):
+        batch.append(chunk.content)
+        if len(batch) >= batch_size:
+            print("".join(batch), end="", flush=True)
+            batch = []
+
+    # 打印剩余内容
+    if batch:
+        print("".join(batch), end="", flush=True)
+
+# 模式4：带超时的流式输出
+import asyncio
+
+async def stream_with_timeout(timeout=30):
+    try:
+        async for chunk in asyncio.as_completed(
+            [llm.astream("讲一个长故事")],
+            timeout=timeout
+        ):
+            async for c in chunk:
+                print(c.content, end="", flush=True)
+    except asyncio.TimeoutError:
+        print("\n[超时，停止生成]")</code></pre>
+                </div>
+
+                <h2>最佳实践</h2>
+
+                <div class="practice" data-label="实践建议">
+                    <h3>1. 总是刷新输出缓冲区</h3>
+                    <ul>
+                        <li>使用 <code>flush=True</code> 确保立即显示</li>
+                        <li>在 Web 应用中禁用服务器缓冲</li>
+                        <li>配置正确的 HTTP 头</li>
+                    </ul>
+
+                    <h3>2. 处理流中断</h3>
+                    <ul>
+                        <li>网络中断时优雅处理</li>
+                        <li>保存已生成的内容</li>
+                        <li>提供重试机制</li>
+                    </ul>
+
+                    <h3>3. 前端优化</h3>
+                    <ul>
+                        <li>使用适当的缓冲策略</li>
+                        <li>实现打字机效果</li>
+                        <li>支持停止生成</li>
+                    </ul>
+
+                    <h3>4. 性能考虑</h3>
+                    <ul>
+                        <li>异步处理避免阻塞</li>
+                        <li>合理设置批处理大小</li>
+                        <li>监控内存使用</li>
+                    </ul>
+
+                    <h3>5. 错误处理</h3>
+                    <ul>
+                        <li>捕获流式过程中的异常</li>
+                        <li>提供有意义的错误信息</li>
+                        <li>实现自动重连</li>
+                    </ul>
+                </div>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. 哪个方法用于同步流式输出？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. astream()</div>
+                            <div class="option correct-option">B. stream()</div>
+                            <div class="option">C. invoke()</div>
+                            <div class="option">D. batch()</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            2. 流式输出的每个 chunk 是什么类型？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. str</div>
+                            <div class="option correct-option">B. AIMessageChunk</div>
+                            <div class="option">C. dict</div>
+                            <div class="option">D. list</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            3. SSE 是什么的缩写？
+                        </div>
+                        <div class="options">
+                            <div class="option">A. Simple Service Endpoint</div>
+                            <div class="option">B. Synchronous Server Events</div>
+                            <div class="option correct-option">C. Server-Sent Events</div>
+                            <div class="option">D. Single Stream Engine</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">代码填空</span>
+                            4. 补全代码：实现异步流式输出
+                        </div>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">python</span>
+                                <button class="copy-btn">复制</button>
+                            </div>
+                            <pre><code class="language-python">async def stream_response():
+    llm = AsyncChatOpenAI(model="gpt-4o")
+    async for chunk in llm.____("你好"):
+        print(chunk.____, end="", flush=True)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            5. 创建一个流式聊天类，支持多轮对话并保存历史记录
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">场景题</span>
+                            6. 你正在构建一个实时的 AI 写作助手，用户输入提示词后，系统需要流式生成文章内容。还需要支持用户随时停止生成。你会如何设计这个系统？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chapter-nav">
+                    <a href="13-callbacks.html">← 上一章：回调系统</a>
+                    <a href="15-tracing.html" class="next">下一章：链路追踪 →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

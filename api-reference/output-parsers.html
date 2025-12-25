@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输出解析器 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-output-parsers">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>输出解析器 API</h1>
+                <p class="subtitle">BaseOutputParser 与结构化输出</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#base" class="api-nav-link">基类</a>
+                    <a href="#types" class="api-nav-link">解析器类型</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>输出解析器将 LLM 的原始输出转换为结构化数据（如 JSON、对象、列表等）。</p>
+
+                <pre class="mermaid">graph TD
+                    A[BaseOutputParser] --> B[StrOutputParser]
+                    A --> C[PydanticOutputParser]
+                    A --> D[JsonOutputParser]
+                    A --> E[CommaSeparatedListOutputParser]
+    A --> F[StructuredOutputParser]
+    A --> G[XMLOutputParser]
+
+    style A fill:#e1f5fe
+    style C fill:#c8e6c9</code></pre>
+
+                <h2 id="base">基类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">BaseOutputParser</h3>
+                    <p class="api-description">输出解析器抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import BaseOutputParser
+
+class BaseOutputParser(Generic[T], ABC):
+    """输出解析器基类
+
+    Type Parameters:
+        T: 输出类型
+    """
+
+    @property
+    @abstractmethod
+    def _type(self) -> str:
+        """返回解析器类型标识"""
+
+    @abstractmethod
+    def parse(self, text: str) -> T:
+        """
+        解析文本
+
+        Args:
+            text: LLM 输出文本
+
+        Returns:
+            解析后的数据
+
+        Raises:
+            OutputParserException: 解析失败
+        """
+
+    def parse_result(
+        self,
+        result: Generation,
+        *,
+        partial: bool = False,
+    ) -> T:
+        """
+        解析 Generation 对象
+
+        Args:
+            result: Generation 对象
+            partial: 是否允许部分解析
+
+        Returns:
+            解析后的数据
+        """
+
+    def get_format_instructions(self) -> str:
+        """
+        获取格式说明
+
+        Returns:
+            格式说明字符串（用于 Prompt）
+        """
+
+    @property
+    def OutputType(self) -> Type[T]:
+        """返回输出类型"""
+        return self.__orig_bases__[0].__args__[0]
+
+    def _fix_json(self, text: str) -> str:
+        """
+        修复 JSON 格式
+
+        Args:
+            text: 可能有问题的 JSON 字符串
+
+        Returns:
+            修复后的 JSON 字符串
+        """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="types">解析器类型</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">StrOutputParser</h3>
+                    <p class="api-description">字符串输出解析器（最常用）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import StrOutputParser
+
+class StrOutputParser(BaseOutputParser[str]):
+    """字符串输出解析器"""
+
+    def parse(self, text: str) -> str:
+        """
+        解析为字符串
+
+        Args:
+            text: LLM 输出（可能是 AIMessage 或字符串）
+
+        Returns:
+            字符串内容
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 在链中使用
+chain = llm | StrOutputParser()
+
+result = chain.invoke("讲一个笑话")
+print(result)  # 纯字符串</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">PydanticOutputParser</h3>
+                    <p class="api-description">Pydantic 模型输出解析器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import PydanticOutputParser
+
+class PydanticOutputParser(BaseOutputParser[BaseModel]):
+    """Pydantic 输出解析器"""
+
+    pydantic_object: Type[BaseModel]
+    """目标 Pydantic 模型"""
+
+    def __init__(
+        self,
+        pydantic_object: Type[BaseModel],
+    ):
+        """
+        初始化
+
+        Args:
+            pydantic_object: 目标 Pydantic 模型类
+        """
+
+    def get_format_instructions(self) -> str:
+        """
+        获取格式说明
+
+        Returns:
+            JSON Schema 格式的说明
+        """
+
+    def parse(self, text: str) -> BaseModel:
+        """
+        解析为 Pydantic 对象
+
+        Args:
+            text: LLM 输出（应该是 JSON）
+
+        Returns:
+            Pydantic 模型实例
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import PydanticOutputParser
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+# 定义输出模型
+class Answer(BaseModel):
+    summary: str = Field(description="答案摘要")
+    confidence: float = Field(description="置信度 (0-1)")
+    sources: list[str] = Field(description="信息来源")
+
+# 创建解析器
+parser = PydanticOutputParser(pydantic_object=Answer)
+
+# 获取格式说明
+format_instructions = parser.get_format_instructions()
+
+# 在提示中使用
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("user", "{format_instructions}\n\n问题: {query}")
+])
+
+chain = prompt | ChatOpenAI(model="gpt-4o") | parser
+
+result = chain.invoke({
+    "query": "什么是 Python？",
+    "format_instructions": format_instructions
+})
+
+print(result.summary)     # "Python 是一种编程语言"
+print(result.confidence)  # 0.95
+print(result.sources)     # ["官方文档", "维基百科"]</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">JsonOutputParser</h3>
+                    <p class="api-description">JSON 输出解析器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import JsonOutputParser
+
+class JsonOutputParser(BaseOutputParser[Union[Dict, List]]):
+    """JSON 输出解析器"""
+
+    def __init__(
+        self,
+        pydantic_object: Optional[Type[BaseModel]] = None,
+    ):
+        """
+        初始化
+
+        Args:
+            pydantic_object: 可选的 Pydantic 模型（用于验证）
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import JsonOutputParser
+
+# 基础使用
+parser = JsonOutputParser()
+
+# 解析 JSON 字符串
+result = parser.parse('{"name": "Alice", "age": 30}')
+# {"name": "Alice", "age": 30}
+
+# 解析 JSON 数组
+result = parser.parse('["apple", "banana", "orange"]')
+# ["apple", "banana", "orange"]
+
+# 在链中使用
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+prompt = PromptTemplate.from_template(
+    "返回 {topic} 的 3 个特点，用 JSON 数组格式: {format_instructions}"
+)
+
+chain = prompt | ChatOpenAI(model="gpt-4o") | parser
+
+result = chain.invoke({
+    "topic": "Python",
+    "format_instructions": parser.get_format_instructions()
+})
+# ["简洁易学", "功能强大", "应用广泛"]</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">CommaSeparatedListOutputParser</h3>
+                    <p class="api-description">逗号分隔列表解析器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import CommaSeparatedListOutputParser
+
+class CommaSeparatedListOutputParser(BaseOutputParser[List[str]]):
+    """逗号分隔列表解析器"""
+
+    def parse(self, text: str) -> List[str]:
+        """
+        解析为列表
+
+        Args:
+            text: 逗号分隔的字符串
+
+        Returns:
+            字符串列表
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import CommaSeparatedListOutputParser
+
+parser = CommaSeparatedListOutputParser()
+
+result = parser.parse("apple, banana, orange")
+# ["apple", "banana", "orange"]
+
+# 在链中使用
+chain = llm | parser
+result = chain.invoke("列出3种水果，用逗号分隔")</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">StructuredOutputParser</h3>
+                    <p class="api-description">结构化输出解析器（旧版）。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import StructuredOutputParser
+
+class StructuredOutputParser(BaseOutputParser[Dict[str, Any]]):
+    """结构化输出解析器（旧版，推荐使用 PydanticOutputParser）"""
+
+    response_schema: Dict[str, Any]
+    """输出模式（字段名到描述的映射）"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">XMLOutputParser</h3>
+                    <p class="api-description">XML 输出解析器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import XMLOutputParser
+
+class XMLOutputParser(BaseOutputParser[Dict[str, Any]]):
+    """XML 输出解析器"""
+
+    tags: List[str]
+    """要提取的标签列表"""
+
+    def __init__(
+        self,
+        tags: List[str],
+        *,
+        strip_tags: bool = False,
+    ):
+        """
+        初始化
+
+        Args:
+            tags: 要提取的 XML 标签
+            strip_tags: 是否移除标签本身
+        """</code></pre>
+                    </div>
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import XMLOutputParser
+
+parser = XMLOutputParser(tags=["name", "age", "city"])
+
+xml_text = """
+<person>
+    <name>Alice</name>
+    <age>30</age>
+    <city>NYC</city>
+</person>
+"""
+
+result = parser.parse(xml_text)
+# {"name": "Alice", "age": "30", "city": "NYC"}</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">RetryOutputParser</h3>
+                    <p class="api-description">带重试的输出解析器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import OutputFixingParser
+
+class OutputFixingParser(BaseOutputParser[T]):
+    """输出修复解析器"""
+
+    parser: BaseOutputParser[T]
+    """底层解析器"""
+
+    retry_llm: BaseLanguageModel
+    """用于修复的 LLM"""
+
+    def __init__(
+        self,
+        parser: BaseOutputParser[T],
+        retry_llm: BaseLanguageModel,
+    ):
+        """
+        初始化
+
+        Args:
+            parser: 可能失败的解析器
+            retry_llm: 用于修复输出的 LLM
+        """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.output_parsers import OutputFixingParser
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    answer: str
+
+base_parser = PydanticOutputParser(pydantic_object=Output)
+fixing_parser = OutputFixingParser.from_llm(
+    parser=base_parser,
+    llm=ChatOpenAI(model="gpt-4o")
+)
+
+# 即使第一次输出格式错误，也会自动修复
+chain = ChatOpenAI(model="gpt-4o") | fixing_parser</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">Custom 装饰器</h3>
+                    <p class="api-description">创建自定义解析器的装饰器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.output_parsers import @output_parser
+
+@output_parser
+def parse_uppercase(text: str) -> str:
+    """将输出转为大写"""
+    return text.upper()
+
+# 使用
+chain = llm | parse_uppercase</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># ========== 示例1: 基础字符串解析 ==========
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+chain = llm | StrOutputParser()
+
+result = chain.invoke("讲一个笑话")
+
+# ========== 示例2: Pydantic 解析 ==========
+from pydantic import BaseModel, Field
+from langchain_core.output_parsers import PydanticOutputParser
+
+class MovieReview(BaseModel):
+    title: str = Field(description="电影标题")
+    rating: float = Field(description="评分 (0-10)")
+    summary: str = Field(description="剧情简介")
+
+parser = PydanticOutputParser(pydantic_object=MovieReview)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个影评人。{format_instructions}"),
+    ("user", "评价电影: {movie_title}")
+])
+
+chain = prompt | ChatOpenAI(model="gpt-4o") | parser
+
+review = chain.invoke({
+    "movie_title": "盗梦空间",
+    "format_instructions": parser.get_format_instructions()
+})
+
+print(review.title)    # "盗梦空间"
+print(review.rating)   # 9.5
+print(review.summary)  # "一部关于梦境的科幻惊悚片..."
+
+# ========== 示例3: JSON 解析 ==========
+from langchain_core.output_parsers import JsonOutputParser
+
+parser = JsonOutputParser()
+
+prompt = PromptTemplate.from_template(
+    "返回 {query} 的 3 个相关信息，用 JSON 格式: {format_instructions}"
+)
+
+chain = prompt | ChatOpenAI(model="gpt-4o") | parser
+
+result = chain.invoke({
+    "query": "Python 编程",
+    "format_instructions": parser.get_format_instructions()
+})
+# ["Python 是一种高级编程语言", "由 Guido van Rossum 创建", "广泛应用于数据科学"]
+
+# ========== 示例4: 自定义解析器 ==========
+from langchain_core.output_parsers import BaseOutputParser
+
+class DateOutputParser(BaseOutputParser[str]):
+    """日期解析器"""
+
+    def parse(self, text: str) -> str:
+        # 提取日期
+        import re
+        date_pattern = r'\d{4}-\d{2}-\d{2}'
+        match = re.search(date_pattern, text)
+        if match:
+            return match.group(0)
+        raise ValueError(f"未找到日期: {text}")
+
+    def get_format_instructions(self) -> str:
+        return "请使用 YYYY-MM-DD 格式返回日期"
+
+chain = llm | DateOutputParser()
+date = chain.invoke("今天是几号？")
+
+# ========== 示例5: 错误处理 ==========
+from langchain_core.exceptions import OutputParserException
+
+try:
+    result = parser.parse("invalid json")
+except OutputParserException as e:
+    print(f"解析失败: {e}")
+
+# 使用带重试的解析器
+from langchain_core.output_parsers import OutputFixingParser
+
+robust_parser = OutputFixingParser.from_llm(
+    parser=base_parser,
+    llm=ChatOpenAI(model="gpt-4o")
+)</code></pre>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="prompts.html">Prompts API</a></li>
+                    <li><a href="../09-output-parsers.html">教程：输出解析</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="checkpointers.html">← Checkpointers API</a>
+                    <a href="document-transformers.html" class="next">Document Transformers API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>

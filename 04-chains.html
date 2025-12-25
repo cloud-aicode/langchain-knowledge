@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链式调用 - LangChain 1.0 知识点</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-chains">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">知识点</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>链式调用 (Chains)</h1>
+                <p class="subtitle">使用 LCEL 构建复杂的工作流</p>
+
+                <h2>什么是 LCEL？</h2>
+                <p><strong>LCEL (LangChain Expression Language)</strong> 是 LangChain 1.0 的声明式链式语法，使用 <code>|</code> 操作符组合组件。</p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python"># LCEL 基本语法
+chain = prompt | model | parser
+
+# 等价于传统写法：
+# chain = prompt | model | parser</code></pre>
+                </div>
+
+                <h2>Runnable 接口</h2>
+                <p>所有 LCEL 组件都实现 <code>Runnable</code> 接口，提供统一的方法：</p>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>方法</th>
+                        <th>说明</th>
+                    </tr>
+                    <tr>
+                        <td><code>stream()</code></td>
+                        <td>流式输出</td>
+                    </tr>
+                    <tr>
+                        <td><code>invoke()</code></td>
+                        <td>同步调用</td>
+                    </tr>
+                    <tr>
+                        <td><code>ainvoke()</code></td>
+                        <td>异步调用</td>
+                    </tr>
+                    <tr>
+                        <td><code>batch()</code></td>
+                        <td>批量处理</td>
+                    </tr>
+                    <tr>
+                        <td><code>abatch()</code></td>
+                        <td>异步批量处理</td>
+                    </tr>
+                    <tr>
+                        <td><code>map()</code></td>
+                        <td>并行映射</td>
+                    </tr>
+                </table>
+
+                <h2>基础链构建</h2>
+
+                <h3>简单链</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
+
+# 创建组件
+prompt = ChatPromptTemplate.from_template("讲个关于{topic}的笑话")
+llm = ChatOpenAI(model="gpt-4o")
+parser = StrOutputParser()
+
+# 用 | 组合成链
+joke_chain = prompt | llm | parser
+
+# 调用
+result = joke_chain.invoke({"topic": "程序员"})
+print(result)</code></pre>
+                </div>
+
+                <h3>并行执行</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnableParallel
+
+# 并行链：同时执行多个操作
+chain = RunnableParallel(
+    joke=prompt | llm | parser,
+    count=prompt | llm | StrOutputParser() | len
+)
+
+# 同时获取笑话和字数
+result = chain.invoke({"topic": "AI"})
+print(result)
+# 输出: {'joke': '...', 'count': 150}</code></pre>
+                </div>
+
+                <h3>路由链</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnableLambda
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+# 定义不同的处理函数
+def handle_code(input):
+    return "这是代码问题"
+
+def handle_general(input):
+    return "这是一般问题"
+
+# 创建路由
+from langchain_core.runnables import RunnableBranch
+
+branch = RunnableBranch(
+    (lambda x: "代码" in x, RunnableLambda(handle_code)),
+    (lambda x: True, RunnableLambda(handle_general))
+)
+
+# 使用路由
+result = branch.invoke("我的代码有问题")
+print(result)  # "这是代码问题"</code></pre>
+                </div>
+
+                <h2>复杂链式组合</h2>
+
+                <h3>顺序执行</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnablePassthrough
+
+# 复杂链：先总结，再翻译，再格式化
+summary_prompt = ChatPromptTemplate.from_template("总结以下内容：\n{content}")
+translate_prompt = ChatPromptTemplate.from_template("翻译成英文：\n{summary}")
+format_prompt = ChatPromptTemplate.from_template("格式化为列表：\n{translation}")
+
+llm = ChatOpenAI(model="gpt-4o")
+
+chain = (
+    {"content": lambda x: x["content"]}
+    | summary_prompt | llm
+    | {"summary": lambda x: x.content}
+    | translate_prompt | llm
+    | {"translation": lambda x: x.content}
+    | format_prompt | llm
+)</code></pre>
+                </div>
+
+                <h3>中间步骤访问</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnablePassthrough
+
+# RunnablePassthrough 传递输入，同时添加新字段
+chain = {
+    "original": RunnablePassthrough(),  # 保留原始输入
+    "processed": prompt | llm | StrOutputParser()  # 处理后的输出
+}
+
+result = chain.invoke({"query": "Python 是什么"})
+# 输出: {'original': {'query': '...'}, 'processed': '...'}</code></pre>
+                </div>
+
+                <h2>错误处理</h2>
+
+                <h3>重试机制</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.runnables import RunnableRetryWithMessage
+from langchain_openai import ChatOpenAI
+
+# 创建带重试的链
+llm = ChatOpenAI(model="gpt-4o")
+
+retry_chain = RunnableRetryWithMessage(
+    llm,
+    max_retries=3,
+    retry_error_message="请重新生成"
+)
+
+result = retry_chain.invoke("讲个笑话")</code></pre>
+                </div>
+
+                <h3>回退策略</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+# 主模型和回退模型
+primary = ChatOpenAI(model="gpt-4o")
+fallback = ChatAnthropic(model="claude-sonnet-4-5-20250514")
+
+# 创建回退链
+from langchain_core.runnables import RunnableWithFallbacks
+
+chain_with_fallback = RunnableWithFallbacks(
+    primary,
+    fallbacks=[fallback]
+)
+
+# 主模型失败时自动使用回退
+result = chain_with_fallback.invoke("Hello")</code></pre>
+                </div>
+
+                <h2>LCEL 流程图</h2>
+
+                <pre class="mermaid">graph TD
+    A[输入] --> B[PromptTemplate]
+    B --> C[ChatModel]
+    C --> D[OutputParser]
+    D --> E[输出]
+
+    C -.->|错误| F[Fallback Model]
+    F --> D</code></pre>
+
+                <h2>动态链构建</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+
+# 动态选择模型
+def create_chain(model_name: str):
+    if model_name == "openai":
+        llm = ChatOpenAI(model="gpt-4o")
+    elif model_name == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+        llm = ChatAnthropic(model="claude-sonnet-4-5-20250514")
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    prompt = ChatPromptTemplate.from_template("回答：{question}")
+    return prompt | llm
+
+# 使用
+chain = create_chain("openai")
+result = chain.invoke({"question": "什么是 LCEL？"})</code></pre>
+                </div>
+
+                <nav class="chapter-nav">
+                    <a href="03-prompts.html" class="prev">← 提示工程</a>
+                    <a href="05-agents.html" class="next">智能体 →</a>
+                </nav>
+
+                <div class="exercise-section">
+                    <h3>✏️ 练习题</h3>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">选择题</span>
+                            1. LCEL 中的 <code>|</code> 操作符的作用是？
+                        </div>
+                        <div class="options">
+                            <div class="option" onclick="this.classList.toggle('selected')">A. 逻辑或运算</div>
+                            <div class="option correct-option onclick="this.classList.toggle('selected')">B. 链式组合组件</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">C. 位运算</div>
+                            <div class="option" onclick="this.classList.toggle('selected')">D. 字符串拼接</div>
+                        </div>
+                    </div>
+
+                    <div class="question">
+                        <div class="question-title">
+                            <span class="question-type">编程题</span>
+                            2. 创建一个链：输入问题 → 获取答案 → 翻译成英文 → 计算字数
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: var(--primary-color);">查看参考答案</summary>
+                            <div class="code-block" style="margin-top: 10px;">
+                                <div class="code-header">
+                                    <span class="code-language">python</span>
+                                    <button class="copy-btn">复制</button>
+                                </div>
+                                <pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+
+# 问题 -> 答案
+qa_prompt = ChatPromptTemplate.from_template("回答：{question}")
+qa_chain = qa_prompt | llm
+
+# 翻译
+translate_prompt = ChatPromptTemplate.from_template("翻译成英文：{text}")
+translate_chain = translate_prompt | llm
+
+# 组合完整链
+chain = (
+    qa_chain
+    | {"answer": lambda x: x.content}
+    | (lambda x: translate_chain.invoke({"text": x["answer"]}))
+    | {"translation": lambda x: x.content, "count": lambda x: len(x.content)}
+)
+
+result = chain.invoke({"question": "什么是 Python？"})
+print(result)  # {'translation': '...', 'count': ...}</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</body>
+</html>

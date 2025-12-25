@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具 API - LangChain 1.0</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="chapter-api-tools">
+    <button class="theme-toggle">🌓</button>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>LangChain 1.0</h1>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">API 参考</p>
+            </div>
+            <div class="sidebar-nav"></div>
+        </nav>
+
+        <main class="main-content">
+            <div class="content">
+                <h1>工具 API</h1>
+                <p class="subtitle">工具定义与 StructuredTool</p>
+
+                <div class="api-nav">
+                    <a href="#overview" class="api-nav-link">概述</a>
+                    <a href="#decorator" class="api-nav-link">装饰器</a>
+                    <a href="#classes" class="api-nav-link">核心类</a>
+                    <a href="#examples" class="api-nav-link">示例</a>
+                </div>
+
+                <h2 id="overview">概述</h2>
+                <p>工具是 Agent 可以调用的函数。LangChain 提供了多种方式来定义和使用工具，包括装饰器、类定义和运行时绑定。</p>
+
+                <pre class="mermaid">graph TD
+    A[BaseTool] --> B[StructuredTool]
+    A --> C[Tool]
+    A --> D[InjectTool]
+
+    E[@tool 装饰器] --> F[自动生成工具]
+    F --> B
+
+    B --> G[Agent 可调用]
+    C --> G
+
+    style A fill:#e1f5fe
+    style B fill:#c8e6c9</code></pre>
+
+                <h2 id="decorator">@tool 装饰器</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">tool</h3>
+                    <p class="api-description">将函数转换为 LangChain 工具的装饰器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import tool
+
+def tool(
+    *args: Union[str, Callable],
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    return_direct: bool = False,
+    args_schema: Optional[Type[BaseModel]] = None,
+    infer_schema: bool = True,
+) -> Union[Tool, Callable[..., Tool]]:
+    """
+    工具装饰器
+
+    Args:
+        *args: 函数或字符串
+            - 如果第一个参数是函数，则装饰该函数
+            - 如果第一个参数是字符串，则作为工具名称
+        name: 工具名称（默认使用函数名）
+        description: 工具描述（默认使用函数文档字符串）
+        return_direct: 是否直接返回结果
+        args_schema: 参数模式（Pydantic 模型）
+        infer_schema: 是否自动推断参数模式
+
+    Returns:
+        Tool 实例或装饰器
+
+    Example:
+        @tool
+        def search(query: str) -> str:
+            '''搜索网络'''
+            return "搜索结果"
+
+        @tool("custom_name", description="自定义描述")
+        def my_function(x: int) -> int:
+            return x * 2
+    """</code></pre>
+                    </div>
+
+                    <h4>使用示例</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.tools import tool
+
+# 基础使用
+@tool
+def search(query: str) -> str:
+    """搜索网络"""
+    return f"关于 {query} 的搜索结果"
+
+# 自定义名称和描述
+@tool("calculate", description="执行数学计算")
+def calculator(expression: str) -> str:
+    """计算数学表达式"""
+    try:
+        return str(eval(expression))
+    except:
+        return "计算错误"
+
+# 带参数验证
+from pydantic import BaseModel, Field
+
+class SearchInput(BaseModel):
+    query: str = Field(description="搜索查询")
+    max_results: int = Field(default=5, description="最大结果数")
+
+@tool("search_advanced", args_schema=SearchInput)
+def advanced_search(query: str, max_results: int = 5) -> str:
+    """高级搜索"""
+    return f"找到 {max_results} 条关于 {query} 的结果"
+
+# 直接返回
+@tool(return_direct=True)
+def final_answer(answer: str) -> str:
+    """返回最终答案"""
+    return answer
+
+# 查看工具信息
+print(search.name)        # "search"
+print(search.description)  # "搜索网络"
+print(search.args_schema)  # 参数模式</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">structured_tool</h3>
+                    <p class="api-description">创建结构化工具的装饰器。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import structured_tool
+
+def structured_tool(
+    *args: Union[str, Callable],
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    return_direct: bool = False,
+) -> Union[StructuredTool, Callable[..., StructuredTool]]:
+    """
+    结构化工具装饰器
+
+    与 tool 的区别在于总是返回 StructuredTool，
+    无论函数参数数量如何
+
+    Args:
+        *args: 函数或字符串
+        name: 工具名称
+        description: 工具描述
+        return_direct: 是否直接返回
+
+    Returns:
+        StructuredTool 实例或装饰器
+    """</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="classes">核心类</h2>
+
+                <div class="api-section">
+                    <h3 class="api-title">BaseTool</h3>
+                    <p class="api-description">所有工具的抽象基类。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import BaseTool
+
+class BaseTool(Serializable, Runnable[ToolInput, ToolOutput]):
+    """工具基类"""
+
+    name: str = ""
+    """工具名称（在 Agent 调用时使用）"""
+
+    description: str = ""
+    """工具描述（传递给 LLM）"""
+
+    args_schema: Type[BaseModel] = BaseModel
+    """参数验证模式"""
+
+    return_direct: bool = False
+    """是否直接返回结果而不继续推理"""
+
+    # 核心方法
+    @abstractmethod
+    def _run(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        同步运行工具
+
+        Args:
+            *args: 位置参数
+            **kwargs: 关键字参数
+
+        Returns:
+            工具执行结果
+        """
+
+    async def _arun(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        异步运行工具（可选实现）
+
+        默认调用 _run
+        """
+        return await asyncio.to_thread(self._run, *args, **kwargs)
+
+    # Runnable 接口实现
+    def invoke(
+        self,
+        input: Union[str, Dict[str, Any]],
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        调用工具（Runnable 接口）
+
+        Args:
+            input: 工具输入（字符串或字典）
+            config: 运行配置
+            **kwargs: 额外参数
+
+        Returns:
+            工具结果
+        """
+
+    def run(
+        self,
+        tool_input: Union[str, Dict[str, Any]],
+        verbose: Optional[bool] = None,
+        start_color: Optional[str] = "green",
+        color: Optional[str] = "green",
+        **kwargs: Any,
+    ) -> Any:
+        """
+        运行工具（兼容方法）
+
+        Args:
+            tool_input: 工具输入
+            verbose: 是否打印详细日志
+            start_color: 日志颜色
+            color: 输出颜色
+            **kwargs: 额外参数
+
+        Returns:
+            工具结果
+        """</code></pre>
+                    </div>
+
+                    <h4>创建自定义工具</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.tools import BaseTool
+from typing import Type, Optional
+from pydantic import BaseModel, Field
+
+class SearchInput(BaseModel):
+    query: str = Field(description="搜索查询")
+
+class CustomSearchTool(BaseTool):
+    name = "custom_search"
+    description = "自定义搜索工具"
+    args_schema: Type[BaseModel] = SearchInput
+
+    def _run(self, query: str) -> str:
+        """同步执行"""
+        return f"搜索结果: {query}"
+
+    async def _arun(self, query: str) -> str:
+        """异步执行"""
+        return f"异步搜索结果: {query}"
+
+# 使用
+tool = CustomSearchTool()
+result = tool.invoke({"query": "Python"})</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">StructuredTool</h3>
+                    <p class="api-description">支持结构化输入的工具。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import StructuredTool
+
+class StructuredTool(BaseTool):
+    """结构化工具"""
+
+    func: Union[
+        Callable[..., Any],
+        Callable[..., Awaitable[Any]]
+    ]
+    """底层函数"""
+
+    coroutine: Optional[Callable[..., Awaitable[Any]]] = None
+    """异步函数（如果与 func 不同）"""
+
+    # 构造方法
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        func: Callable[..., Any],
+        args_schema: Type[BaseModel],
+        return_direct: bool = False,
+        coroutine: Optional[Callable[..., Awaitable[Any]]] = None,
+        **kwargs: Any,
+    ):
+        """
+        初始化结构化工具
+
+        Args:
+            name: 工具名称
+            description: 工具描述
+            func: 同步函数
+            args_schema: 参数模式
+            return_direct: 是否直接返回
+            coroutine: 异步函数（可选）
+            **kwargs: 额外参数
+        """</code></pre>
+                    </div>
+
+                    <h4>创建方式</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
+
+class CalculatorInput(BaseModel):
+    expression: str = Field(description="数学表达式")
+
+def calculate(expression: str) -> str:
+    """计算表达式"""
+    try:
+        return str(eval(expression))
+    except:
+        return "错误"
+
+# 方式1: 直接创建
+calculator = StructuredTool.from_function(
+    func=calculate,
+    name="calculator",
+    description="执行数学计算",
+    args_schema=CalculatorInput
+)
+
+# 方式2: 使用 from_function 类方法
+calculator = StructuredTool.from_function(
+    calculate,
+    name="calculator",
+    description="执行数学计算",
+    args_schema=CalculatorInput
+)
+
+# 方式3: 使用装饰器
+from langchain_core.tools import tool
+
+@tool
+def calculator_tool(expression: str) -> str:
+    """计算数学表达式"""
+    return str(eval(expression))</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">Tool</h3>
+                    <p class="api-description">简单工具，接受单个字符串输入。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import Tool
+
+class Tool(BaseTool):
+    """简单工具（单字符串输入）"""
+
+    func: Callable[[str], Any]
+    """工具函数"""
+
+    # 构造方法
+    def __init__(
+        self,
+        name: str,
+        func: Callable[[str], Any],
+        description: str,
+        return_direct: bool = False,
+        **kwargs: Any,
+    ):
+        """
+        初始化简单工具
+
+        Args:
+            name: 工具名称
+            func: 工具函数（接受单个字符串）
+            description: 工具描述
+            return_direct: 是否直接返回
+            **kwargs: 额外参数
+        """</code></pre>
+                    </div>
+
+                    <h4>创建方式</h4>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">python</span>
+                            <button class="copy-btn">复制</button>
+                        </div>
+                        <pre><code class="language-python">from langchain_core.tools import Tool
+
+# 方式1: 直接实例化
+search_tool = Tool(
+    name="search",
+    func=lambda query: f"搜索结果: {query}",
+    description="搜索网络"
+)
+
+# 方式2: 使用 from_function
+def search_func(query: str) -> str:
+    return f"搜索结果: {query}"
+
+search_tool = Tool.from_function(
+    func=search_func,
+    name="search",
+    description="搜索网络"
+)
+
+# 方式3: 使用装饰器
+@tool
+def search(query: str) -> str:
+    """搜索网络"""
+    return f"搜索结果: {query}"</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">InjectTool</h3>
+                    <p class="api-description">注入工具，直接返回预设值而不执行。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import InjectTool
+
+class InjectTool(BaseTool):
+    """注入工具"""
+
+    value: Any
+    """要返回的预设值"""
+
+    def _run(self, *args: Any, **kwargs: Any) -> Any:
+        """直接返回预设值"""
+        return self.value</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">ToolInvocation</h3>
+                    <p class="api-description">工具调用记录。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import ToolInvocation
+
+class ToolInvocation(TypedDict):
+    """工具调用"""
+
+    name: str
+    """工具名称"""
+
+    id: Optional[str]
+    """调用 ID"""
+
+    args: Dict[str, Any]
+    """工具参数"""</code></pre>
+                    </div>
+                </div>
+
+                <div class="api-section">
+                    <h3 class="api-title">tool 装饰器函数</h3>
+                    <p class="api-description">便捷的函数式工具创建。</p>
+
+                    <div class="api-signature">
+                        <pre><code class="language-python">from langchain_core.tools import tool
+
+# 无参数
+@tool
+def simple_tool(input: str) -> str:
+    """简单工具"""
+    return input.upper()
+
+# 带名称
+@tool("my_tool")
+def named_tool(input: str) -> str:
+    """命名工具"""
+    return input.upper()
+
+# 带描述
+@tool(description="这是一个自定义工具")
+def described_tool(input: str) -> str:
+    """带描述的工具"""
+    return input.upper()
+
+# 完整参数
+@tool(
+    name="complete_tool",
+    description="完整的工具定义",
+    return_direct=True
+)
+def complete(input: str) -> str:
+    """完整工具"""
+    return input.upper()
+
+# 使用参数模式
+from pydantic import BaseModel
+
+class InputSchema(BaseModel):
+    text: str
+    times: int = 1
+
+@tool(args_schema=InputSchema)
+def complex_tool(text: str, times: int = 1) -> str:
+    """复杂工具"""
+    return text * times</code></pre>
+                    </div>
+                </div>
+
+                <h2 id="examples">使用示例</h2>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">python</span>
+                        <button class="copy-btn">复制</button>
+                    </div>
+                    <pre><code class="language-python">from langchain_core.tools import tool, Tool, StructuredTool
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate
+
+# ========== 示例1: 使用 @tool 装饰器 ==========
+
+@tool
+def search(query: str) -> str:
+    """搜索网络获取信息"""
+    return f"关于 {query} 的搜索结果"
+
+@tool
+def calculator(expression: str) -> str:
+    """计算数学表达式"""
+    try:
+        return str(eval(expression))
+    except:
+        return "计算错误"
+
+# ========== 示例2: 自定义工具类 ==========
+
+from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field
+
+class WeatherInput(BaseModel):
+    city: str = Field(description="城市名称")
+    unit: str = Field(default="celsius", description="温度单位")
+
+class WeatherTool(BaseTool):
+    name = "get_weather"
+    description = "获取指定城市的天气"
+    args_schema = WeatherInput
+
+    def _run(self, city: str, unit: str = "celsius") -> str:
+        return f"{city} 今天是晴天，温度 25°{unit}"
+
+    async def _arun(self, city: str, unit: str = "celsius") -> str:
+        # 模拟 API 调用
+        return f"{city}（异步查询）今天晴天，25°{unit}"
+
+weather = WeatherTool()
+
+# ========== 示例3: StructuredTool ==========
+
+from pydantic import BaseModel
+
+class EmailInput(BaseModel):
+    to: str = Field(description="收件人邮箱")
+    subject: str = Field(description="邮件主题")
+    body: str = Field(description="邮件正文")
+
+def send_email(to: str, subject: str, body: str) -> str:
+    """发送邮件"""
+    # 实际实现会调用邮件 API
+    return f"邮件已发送给 {to}"
+
+email_tool = StructuredTool.from_function(
+    func=send_email,
+    name="send_email",
+    description="发送邮件",
+    args_schema=EmailInput
+)
+
+# ========== 示例4: Tool（简单输入） ==========
+
+simple_search = Tool(
+    name="simple_search",
+    func=lambda q: f"搜索 {q}",
+    description="简单搜索工具"
+)
+
+# ========== 示例5: 与 Agent 集成 ==========
+
+tools = [search, calculator, weather, email_tool]
+
+llm = ChatOpenAI(model="gpt-4o")
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是一个有帮助的助手"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True
+)
+
+result = agent_executor.invoke({
+    "input": "北京天气怎么样？顺便计算 25 * 4"
+})
+
+# ========== 示例6: 异步工具 ==========
+
+import asyncio
+
+@tool
+async def async_search(query: str) -> str:
+    """异步搜索"""
+    await asyncio.sleep(0.1)
+    return f"异步搜索结果: {query}"
+
+# ========== 示例7: 直接调用工具 ==========
+
+# 方式1: invoke
+result = search.invoke("Python")
+
+# 方式2: 直接调用
+result = search.func("Python")
+
+# 方式3: run
+result = search.run("Python")</code></pre>
+                </div>
+
+                <h2>内置工具</h2>
+
+                <div class="api-table">
+                    <tr>
+                        <th>模块</th>
+                        <th>工具</th>
+                        <th>描述</th>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>Shell</td>
+                        <td>执行 shell 命令</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>PythonREPL</td>
+                        <td>执行 Python 代码</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>RequestsGetTool</td>
+                        <td>HTTP GET 请求</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>RequestsPostTool</td>
+                        <td>HTTP POST 请求</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>SerpAPIWrapper</td>
+                        <td>Google 搜索</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>WikipediaQueryRun</td>
+                        <td>Wikipedia 查询</td>
+                    </tr>
+                    <tr>
+                        <td>langchain_community.tools</td>
+                        <td>Shell</td>
+                        <td>执行命令</td>
+                    </tr>
+                </div>
+
+                <h2>相关 API</h2>
+                <ul>
+                    <li><a href="agents.html">Agents API</a></li>
+                    <li><a href="chat-models.html">Chat Models API</a> - bind_tools 方法</li>
+                    <li><a href="../05-tools.html">教程：工具系统</a></li>
+                </ul>
+
+                <div class="chapter-nav">
+                    <a href="agents.html">← Agents API</a>
+                    <a href="document-loaders.html" class="next">Document Loaders API →</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+</body>
+</html>
